@@ -112,7 +112,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const DEFAULT_TICKERS = ['IREN','IONQ','HIMS','RKLB','OSCR','SOFI'];
+const DEFAULT_TICKERS = ['ASTS','BMNR','CIFR','CLSK','COIN','DRAM','ENPH','EOSE','GGAL','HIMS','HOOD','IONQ','IREN','KEEL','LAC','MARA','MSTR','NBIS','NU','NVTS','OKLO','ONDS','OSCR','PAGS','POET','RGTI','RIVN','RKLB','SOFI','TEM','VIST','VST','YPF'];
 const STORAGE_KEY = 'heatmap_v4';
 const STORAGE_KEY_OLD = 'heatmap_v3';
 
@@ -123,9 +123,11 @@ const PROXIES = [
   { name:'thingproxy',   wrap:u=>`https://thingproxy.freeboard.io/fetch/${u}` },
 ];
 
-// Migrar desde v3 si existe
+// Migrar desde v3 si existe y fusionar con defaults
 const _saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY_OLD);
-let tickers = (JSON.parse(_saved||'null')||[...DEFAULT_TICKERS]).sort();
+const _stored = JSON.parse(_saved||'null') || [];
+const _merged = [...new Set([..._stored, ...DEFAULT_TICKERS])];
+let tickers = _merged.sort();
 let metric = 'day';
 let view = 'price'; // 'price' | 'rsi'
 let rsiPeriod = 'daily';
