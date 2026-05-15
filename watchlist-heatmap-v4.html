@@ -262,8 +262,11 @@ async function fetchTicker(ticker) {
     const price = meta.regularMarketPrice;
     const closes = result?.indicators?.quote?.[0]?.close?.filter(c=>c!=null)||[];
 
-    // dayPct: directo de Yahoo, mismo valor que muestra en su web
-    const dayPct = meta.regularMarketChangePercent ?? null;
+    // dayPct: regularMarketChangePercent cuando está disponible (mercado abierto)
+    // sino calcular con chartPreviousClose (cierre oficial de ayer, siempre presente)
+    const dayPct = meta.regularMarketChangePercent != null
+      ? meta.regularMarketChangePercent
+      : (meta.chartPreviousClose ? ((price - meta.chartPreviousClose) / meta.chartPreviousClose) * 100 : null);
 
     // weekPct: cierre de hace ~5 sesiones vs precio actual
     const weekIdx = Math.max(0, closes.length-6);
