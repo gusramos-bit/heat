@@ -288,10 +288,25 @@ async function fetchTicker(ticker) {
       rsiWeekly = calcRSI([...closesW, priceW], 14);
     } catch(e) { rsiWeekly = null; }
 
-    // Pre/post market
-    const prePost = meta.preMarketPrice || meta.postMarketPrice || null;
-    const prePostPct = prePost ? ((prePost - (closes5[closes5.length-1]||price)) / (closes5[closes5.length-1]||price)) * 100 : null;
-    const prePostLabel = meta.preMarketPrice ? 'Pre' : (meta.postMarketPrice ? 'Post' : null);
+    // Pre/post market via v7/finance/quote que tiene estos campos correctamente
+    let prePost = null, prePostPct = null, prePostLabel = null;
+    try {
+      const urlQ = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}&fields=marketState,preMarketPrice,preMarketChangePercent,postMarketPrice,postMarketChangePercent`;
+      const resQ = await tryFetch(urlQ);
+      const jsonQ = await resQ.json();
+      const q = jsonQ?.quoteResponse?.result?.[0];
+      if (q) {
+        if (q.marketState === 'PRE' && q.preMarketPrice) {
+          prePost = q.preMarketPrice;
+          prePostPct = q.preMarketChangePercent;
+          prePostLabel = 'Pre';
+        } else if ((q.marketState === 'POST' || q.marketState === 'POSTPOST' || q.marketState === 'CLOSED') && q.postMarketPrice) {
+          prePost = q.postMarketPrice;
+          prePostPct = q.postMarketChangePercent;
+          prePostLabel = 'Post';
+        }
+      }
+    } catch(e) { /* sin pre/post */ }
 
     return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, prePost, prePostPct, prePostLabel, name:meta.shortName||ticker, ok:true };
   } catch(e) {
