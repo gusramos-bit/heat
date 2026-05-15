@@ -251,31 +251,31 @@ async function tryFetch(url) {
 
 async function fetchTicker(ticker) {
   try {
-    // 30d para tener suficientes cierres para RSI(14)
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=30d&includePrePost=false`;
-    const res = await tryFetch(url);
-    const json = await res.json();
-    const result = json?.chart?.result?.[0];
-    const meta = result?.meta;
+    // Dos llamadas en paralelo: 5d para precios del dia, 30d para RSI
+    const url5  = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d&includePrePost=true`;
+    const url30 = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=30d&includePrePost=false`;
+    const [res5, res30] = await Promise.all([tryFetch(url5), tryFetch(url30)]);
+    const json5  = await res5.json();
+    const json30 = await res30.json();
+    const result = json5?.chart?.result?.[0];
+    const meta   = result?.meta;
     if (!meta) throw new Error('Sin datos');
 
-    const price = meta.regularMarketPrice;
-    const closes = result?.indicators?.quote?.[0]?.close?.filter(c=>c!=null)||[];
+    const price   = meta.regularMarketPrice;
+    const closes5 = result?.indicators?.quote?.[0]?.close?.filter(c=>c!=null)||[];
 
-    // dayPct: regularMarketChangePercent cuando está disponible (mercado abierto)
-    // sino calcular con chartPreviousClose (cierre oficial de ayer, siempre presente)
+    // dayPct: regularMarketChangePercent (mercado abierto) o anteultimo close de 5d (cerrado)
     const dayPct = meta.regularMarketChangePercent != null
       ? meta.regularMarketChangePercent
-      : (meta.chartPreviousClose ? ((price - meta.chartPreviousClose) / meta.chartPreviousClose) * 100 : null);
+      : (closes5.length >= 2 ? ((price - closes5[closes5.length-2]) / closes5[closes5.length-2]) * 100 : null);
 
-    // weekPct: cierre de hace ~5 sesiones vs precio actual
-    const weekIdx = Math.max(0, closes.length-6);
-    const weekStart = closes[weekIdx];
-    const weekPct = weekStart ? ((price-weekStart)/weekStart)*100 : null;
+    // weekPct: primer close del rango de 5d vs precio actual
+    const weekStart = closes5.length > 0 ? closes5[0] : null;
+    const weekPct = weekStart ? ((price - weekStart) / weekStart) * 100 : null;
 
-    // RSI diario(14)
-    const allCloses = [...closes, price];
-    const rsi = calcRSI(allCloses, 14);
+    // RSI diario(14) con datos de 30d
+    const closes30 = json30?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c=>c!=null)||[];
+    const rsi = calcRSI([...closes30, price], 14);
 
     // RSI semanal(14): llamada separada con interval=1wk
     let rsiWeekly = null;
@@ -290,7 +290,7 @@ async function fetchTicker(ticker) {
 
     // Pre/post market
     const prePost = meta.preMarketPrice || meta.postMarketPrice || null;
-    const prePostPct = prePost ? ((prePost - (closes[closes.length-1]||price)) / (closes[closes.length-1]||price)) * 100 : null;
+    const prePostPct = prePost ? ((prePost - (closes5[closes5.length-1]||price)) / (closes5[closes5.length-1]||price)) * 100 : null;
     const prePostLabel = meta.preMarketPrice ? 'Pre' : (meta.postMarketPrice ? 'Post' : null);
 
     return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, prePost, prePostPct, prePostLabel, name:meta.shortName||ticker, ok:true };
