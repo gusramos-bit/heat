@@ -265,7 +265,7 @@ async function tryFetch(url) {
 async function fetchTicker(ticker) {
   try {
     // Dos llamadas en paralelo: 5d para precios del dia, 30d para RSI
-    const url5  = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d&includePrePost=true`;
+    const url5  = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d&includePrePost=false`;
     const url30 = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=30d&includePrePost=false`;
     const [res5, res30] = await Promise.all([tryFetch(url5), tryFetch(url30)]);
     const json5  = await res5.json();
@@ -301,21 +301,9 @@ async function fetchTicker(ticker) {
       rsiWeekly = calcRSI([...closesW, priceW], 14);
     } catch(e) { rsiWeekly = null; }
 
-    // Pre/post market desde meta del v8/chart (range=5d con includePrePost=true)
-    let prePost = null, prePostPct = null, prePostLabel = null;
-    const lastClose = closes5.length > 0 ? closes5[closes5.length-1] : price;
-    if (meta.preMarketPrice) {
-      prePost = meta.preMarketPrice;
-      prePostPct = lastClose ? ((meta.preMarketPrice - lastClose) / lastClose) * 100 : null;
-      prePostLabel = 'Pre';
-    } else if (meta.postMarketPrice) {
-      prePost = meta.postMarketPrice;
-      prePostPct = lastClose ? ((meta.postMarketPrice - lastClose) / lastClose) * 100 : null;
-      prePostLabel = 'Post';
-    }
-    console.log(ticker, 'pre:', meta.preMarketPrice, 'post:', meta.postMarketPrice, 'lastClose:', lastClose);
 
-    return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, prePost, prePostPct, prePostLabel, name:meta.shortName||ticker, ok:true };
+
+    return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, name:meta.shortName||ticker, ok:true };
   } catch(e) {
     console.warn(ticker, e.message);
     return { ticker, price:null, dayPct:null, weekPct:null, rsi:null, ok:false };
@@ -376,16 +364,12 @@ function renderGrid(loading=false) {
     // VIEW: price
     const pct = metric==='day' ? d.dayPct : d.weekPct;
     const bg = pct!=null ? getColorPrice(pct) : 'var(--surface)';
-    const prePostLine = d.prePostLabel
-      ? `<div style="font-size:9px;color:rgba(255,255,255,0.55);margin-top:3px">${d.prePostLabel}: $${d.prePost.toFixed(2)} <span style="color:${d.prePostPct>=0?'#7fffb0':'#ff9090'}">${fmtPct(d.prePostPct)}</span></div>`
-      : '';
     return `<div class="tile" style="background:${bg}">
       <button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button>
       <div class="ticker">${ticker}</div>
       <div class="pct">${fmtPct(pct)}</div>
       <div class="price">${d.price ? '$'+d.price.toFixed(2) : ''}</div>
       <div class="company-name">${d.name}</div>
-      ${prePostLine}
     </div>`;
   }).join('');
 }
