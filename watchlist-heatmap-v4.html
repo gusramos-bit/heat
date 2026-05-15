@@ -288,26 +288,19 @@ async function fetchTicker(ticker) {
       rsiWeekly = calcRSI([...closesW, priceW], 14);
     } catch(e) { rsiWeekly = null; }
 
-    // Pre/post market via v7/finance/quote que tiene estos campos correctamente
+    // Pre/post market desde meta del v8/chart (range=5d con includePrePost=true)
     let prePost = null, prePostPct = null, prePostLabel = null;
-    try {
-      const urlQ = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}&fields=marketState,preMarketPrice,preMarketChangePercent,postMarketPrice,postMarketChangePercent`;
-      const resQ = await tryFetch(urlQ);
-      const jsonQ = await resQ.json();
-      const q = jsonQ?.quoteResponse?.result?.[0];
-      if (q) {
-        console.log(ticker, 'marketState:', q.marketState, 'post:', q.postMarketPrice, 'postPct:', q.postMarketChangePercent, 'pre:', q.preMarketPrice);
-        if (q.marketState === 'PRE' && q.preMarketPrice) {
-          prePost = q.preMarketPrice;
-          prePostPct = q.preMarketChangePercent;
-          prePostLabel = 'Pre';
-        } else if ((q.marketState === 'POST' || q.marketState === 'POSTPOST' || q.marketState === 'CLOSED') && q.postMarketPrice) {
-          prePost = q.postMarketPrice;
-          prePostPct = q.postMarketChangePercent;
-          prePostLabel = 'Post';
-        }
-      }
-    } catch(e) { /* sin pre/post */ }
+    const lastClose = closes5.length > 0 ? closes5[closes5.length-1] : price;
+    if (meta.preMarketPrice) {
+      prePost = meta.preMarketPrice;
+      prePostPct = lastClose ? ((meta.preMarketPrice - lastClose) / lastClose) * 100 : null;
+      prePostLabel = 'Pre';
+    } else if (meta.postMarketPrice) {
+      prePost = meta.postMarketPrice;
+      prePostPct = lastClose ? ((meta.postMarketPrice - lastClose) / lastClose) * 100 : null;
+      prePostLabel = 'Post';
+    }
+    console.log(ticker, 'pre:', meta.preMarketPrice, 'post:', meta.postMarketPrice, 'lastClose:', lastClose);
 
     return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, prePost, prePostPct, prePostLabel, name:meta.shortName||ticker, ok:true };
   } catch(e) {
