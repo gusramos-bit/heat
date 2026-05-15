@@ -296,6 +296,7 @@ async function fetchTicker(ticker) {
       const jsonQ = await resQ.json();
       const q = jsonQ?.quoteResponse?.result?.[0];
       if (q) {
+        console.log(ticker, 'marketState:', q.marketState, 'post:', q.postMarketPrice, 'postPct:', q.postMarketChangePercent, 'pre:', q.preMarketPrice);
         if (q.marketState === 'PRE' && q.preMarketPrice) {
           prePost = q.preMarketPrice;
           prePostPct = q.preMarketChangePercent;
