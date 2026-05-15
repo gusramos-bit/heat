@@ -98,12 +98,12 @@ const PROXIES = [
   { name: 'thingproxy',     wrap: u => `https://thingproxy.freeboard.io/fetch/${u}` },
 ];
 
-let tickers = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || [...DEFAULT_TICKERS];
+let tickers = (JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || [...DEFAULT_TICKERS]).sort();
 let metric = 'day';
 let dataCache = {};
 let activeProxyIdx = null;
 
-function saveTickers() { localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers)); }
+function saveTickers() { tickers.sort(); localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers)); }
 
 function setMetric(m) {
   metric = m;
@@ -219,7 +219,7 @@ function renderGrid(loading = false) {
     }
     const pct = metric === 'day' ? d.dayPct : d.weekPct;
     const bg = pct != null ? getColor(pct) : 'var(--surface)';
-    const w = pct != null ? Math.max(105, Math.min(160, 105 + Math.abs(pct) * 4.5)) : 120;
+    const w = 130;
     return `<div class="tile" style="background:${bg};width:${w}px">
       <button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button>
       <div class="ticker">${ticker}</div>
