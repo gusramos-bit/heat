@@ -118,10 +118,12 @@ const STORAGE_KEY_OLD = 'heatmap_v3';
 const STORAGE_KEY_REMOVED = 'heatmap_v4_removed';
 
 const PROXIES = [
-  { name:'corsproxy.io', wrap:u=>`https://corsproxy.io/?${encodeURIComponent(u)}` },
-  { name:'allorigins',   wrap:u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
-  { name:'cors.eu.org',  wrap:u=>`https://cors.eu.org/${u}` },
-  { name:'thingproxy',   wrap:u=>`https://thingproxy.freeboard.io/fetch/${u}` },
+  { name:'corsproxy.io',   wrap:u=>`https://corsproxy.io/?${encodeURIComponent(u)}` },
+  { name:'allorigins',     wrap:u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
+  { name:'codetabs',       wrap:u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}` },
+  { name:'jsonp.afeld',    wrap:u=>`https://jsonp.afeld.me/?url=${encodeURIComponent(u)}` },
+  { name:'cors.eu.org',    wrap:u=>`https://cors.eu.org/${u}` },
+  { name:'crossorigin.me', wrap:u=>`https://crossorigin.me/${u}` },
 ];
 
 // Migrar desde v3 si existe y fusionar con defaults respetando eliminados
@@ -223,28 +225,39 @@ function fmtPct(v) {
 }
 
 async function tryFetch(url) {
-  const timeout = 7000;
-  if (activeProxyIdx!==null) {
+  const timeout = 6000;
+  // Intentar proxy activo primero
+  if (activeProxyIdx !== null) {
     try {
-      const ctrl=new AbortController();
-      const tid=setTimeout(()=>ctrl.abort(),timeout);
-      const res=await fetch(PROXIES[activeProxyIdx].wrap(url),{signal:ctrl.signal});
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), timeout);
+      const res = await fetch(PROXIES[activeProxyIdx].wrap(url), {signal: ctrl.signal});
       clearTimeout(tid);
       if (res.ok) return res;
-    } catch(e) { activeProxyIdx=null; }
+      activeProxyIdx = null; // falló, resetear
+    } catch(e) { activeProxyIdx = null; }
   }
-  for (let i=0;i<PROXIES.length;i++) {
-    try {
-      const ctrl=new AbortController();
-      const tid=setTimeout(()=>ctrl.abort(),timeout);
-      const res=await fetch(PROXIES[i].wrap(url),{signal:ctrl.signal});
-      clearTimeout(tid);
-      if (res.ok) {
-        activeProxyIdx=i;
-        document.getElementById('proxy-status').innerHTML=`Via <span>${PROXIES[i].name}</span>`;
-        return res;
-      }
-    } catch(e) { continue; }
+  // Probar todos en paralelo y usar el primero que responda
+  const results = await Promise.allSettled(
+    PROXIES.map((p, i) =>
+      new Promise(async (resolve, reject) => {
+        try {
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), timeout);
+          const res = await fetch(p.wrap(url), {signal: ctrl.signal});
+          clearTimeout(tid);
+          if (res.ok) resolve({res, i});
+          else reject(new Error('not ok'));
+        } catch(e) { reject(e); }
+      })
+    )
+  );
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      activeProxyIdx = r.value.i;
+      document.getElementById('proxy-status').innerHTML = `Via <span>${PROXIES[r.value.i].name}</span>`;
+      return r.value.res;
+    }
   }
   throw new Error('Sin conexión');
 }
