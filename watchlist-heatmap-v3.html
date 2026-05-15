@@ -162,18 +162,24 @@ async function tryFetch(url) {
 
 async function fetchTicker(ticker) {
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=7d`;
+    // range=5d para tener cierre de ayer (dayPct) y 5 dias atras (weekPct)
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d&includePrePost=false`;
     const res = await tryFetch(url);
     const json = await res.json();
-    const meta = json?.chart?.result?.[0]?.meta;
+    const result = json?.chart?.result?.[0];
+    const meta = result?.meta;
     if (!meta) throw new Error('Sin datos');
 
     const price = meta.regularMarketPrice;
-    const prevClose = meta.chartPreviousClose || meta.previousClose;
+
+    // dayPct: chartPreviousClose es el cierre del dia anterior segun Yahoo
+    const prevClose = meta.chartPreviousClose;
     const dayPct = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
 
-    const closes = json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c => c != null) || [];
-    const weekPct = closes.length > 1 ? ((price - closes[0]) / closes[0]) * 100 : null;
+    // weekPct: primer close disponible de los ultimos 5 dias
+    const closes = result?.indicators?.quote?.[0]?.close?.filter(c => c != null) || [];
+    const weekStart = closes.length > 1 ? closes[0] : null;
+    const weekPct = weekStart ? ((price - weekStart) / weekStart) * 100 : null;
 
     return { ticker, price, dayPct, weekPct, name: meta.shortName || ticker, ok: true };
   } catch(e) {
