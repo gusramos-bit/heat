@@ -80,8 +80,8 @@
     <button class="toggle-btn" id="btn-week" onclick="setMetric('week')">Semana %</button>
   </div>
   <div class="toggle-group" id="rsi-period-group" style="display:none">
-    <button class="toggle-btn active" id="btn-rsi14" onclick="setRsiPeriod(14)">RSI 14d</button>
-    <button class="toggle-btn" id="btn-rsi7" onclick="setRsiPeriod(7)">RSI 7d</button>
+    <button class="toggle-btn active" id="btn-rsi14" onclick="setRsiPeriod('daily')">RSI Diario</button>
+    <button class="toggle-btn" id="btn-rsi7" onclick="setRsiPeriod('weekly')">RSI Semanal</button>
   </div>
   <button class="btn" onclick="refreshAll()">↻ Actualizar</button>
   <span class="last-update" id="last-update">—</span>
@@ -128,7 +128,7 @@ const _saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE
 let tickers = (JSON.parse(_saved||'null')||[...DEFAULT_TICKERS]).sort();
 let metric = 'day';
 let view = 'price'; // 'price' | 'rsi'
-let rsiPeriod = 14;
+let rsiPeriod = 'daily';
 let dataCache = {};
 let activeProxyIdx = null;
 
@@ -167,8 +167,8 @@ function setView(v) {
 
 function setRsiPeriod(p) {
   rsiPeriod = p;
-  document.getElementById('btn-rsi14').classList.toggle('active', p===14);
-  document.getElementById('btn-rsi7').classList.toggle('active', p===7);
+  document.getElementById('btn-rsi14').classList.toggle('active', p==='daily');
+  document.getElementById('btn-rsi7').classList.toggle('active', p==='weekly');
   renderGrid();
 }
 
@@ -267,17 +267,27 @@ async function fetchTicker(ticker) {
     const weekStart = closes[weekIdx];
     const weekPct = weekStart ? ((price-weekStart)/weekStart)*100 : null;
 
-    // RSI con todos los cierres disponibles + precio actual
+    // RSI diario(14)
     const allCloses = [...closes, price];
     const rsi = calcRSI(allCloses, 14);
-    const rsi7 = calcRSI(allCloses, 7);
+
+    // RSI semanal(14): llamada separada con interval=1wk
+    let rsiWeekly = null;
+    try {
+      const urlW = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=52wk&includePrePost=false`;
+      const resW = await tryFetch(urlW);
+      const jsonW = await resW.json();
+      const closesW = jsonW?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c=>c!=null)||[];
+      const priceW = jsonW?.chart?.result?.[0]?.meta?.regularMarketPrice || price;
+      rsiWeekly = calcRSI([...closesW, priceW], 14);
+    } catch(e) { rsiWeekly = null; }
 
     // Pre/post market
     const prePost = meta.preMarketPrice || meta.postMarketPrice || null;
     const prePostPct = prePost ? ((prePost - (closes[closes.length-1]||price)) / (closes[closes.length-1]||price)) * 100 : null;
     const prePostLabel = meta.preMarketPrice ? 'Pre' : (meta.postMarketPrice ? 'Post' : null);
 
-    return { ticker, price, dayPct, weekPct, rsi, rsi7, prePost, prePostPct, prePostLabel, name:meta.shortName||ticker, ok:true };
+    return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, prePost, prePostPct, prePostLabel, name:meta.shortName||ticker, ok:true };
   } catch(e) {
     console.warn(ticker, e.message);
     return { ticker, price:null, dayPct:null, weekPct:null, rsi:null, ok:false };
@@ -322,14 +332,14 @@ function renderGrid(loading=false) {
     }
 
     if (view==='rsi') {
-      const rsi = rsiPeriod===7 ? d.rsi7 : d.rsi;
+      const rsi = rsiPeriod==='weekly' ? d.rsiWeekly : d.rsi;
       const bg = rsi!=null ? getColorRSI(rsi) : 'var(--surface)';
       const barW = rsi!=null ? rsi.toFixed(0) : 0;
       return `<div class="tile" style="background:${bg}">
         <button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button>
         <div class="ticker">${ticker}</div>
         <div class="rsi-val">${rsi!=null ? rsi.toFixed(1) : '—'}</div>
-        <div class="rsi-label">RSI ${rsiPeriod} · ${rsiLabel(rsi)}</div>
+        <div class="rsi-label">RSI 14 ${rsiPeriod==='weekly'?'Semanal':'Diario'} · ${rsiLabel(rsi)}</div>
         <div class="rsi-bar-wrap"><div class="rsi-bar-fill" style="width:${barW}%"></div></div>
         <div class="rsi-zones"><span>0</span><span>30</span><span>70</span><span>100</span></div>
       </div>`;
