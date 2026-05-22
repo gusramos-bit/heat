@@ -205,18 +205,28 @@ function getColorRSI(rsi) {
 }
 
 function calcRSI(closes, period=14) {
-  if (closes.length < period+1) return null;
-  const recent = closes.slice(-(period+1));
-  let gains=0, losses=0;
-  for (let i=1; i<recent.length; i++) {
-    const diff = recent[i]-recent[i-1];
-    if (diff>0) gains+=diff; else losses+=Math.abs(diff);
+  if (closes.length < period+2) return null;
+  // Metodo de Wilder (igual que TradingView)
+  // Paso 1: primer avgGain/avgLoss = promedio simple de las primeras 'period' diferencias
+  let gains = 0, losses = 0;
+  for (let i=1; i<=period; i++) {
+    const diff = closes[i] - closes[i-1];
+    if (diff > 0) gains += diff;
+    else losses += Math.abs(diff);
   }
-  const avgGain = gains/period;
-  const avgLoss = losses/period;
-  if (avgLoss===0) return 100;
-  const rs = avgGain/avgLoss;
-  return 100-(100/(1+rs));
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  // Paso 2: suavizado exponencial de Wilder para el resto
+  for (let i=period+1; i<closes.length; i++) {
+    const diff = closes[i] - closes[i-1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? Math.abs(diff) : 0;
+    avgGain = (avgGain * (period-1) + gain) / period;
+    avgLoss = (avgLoss * (period-1) + loss) / period;
+  }
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1+rs));
 }
 
 function fmtPct(v) {
@@ -266,7 +276,7 @@ async function fetchTicker(ticker) {
   try {
     // Dos llamadas en paralelo: 5d para precios del dia, 30d para RSI
     const url5  = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d&includePrePost=false`;
-    const url30 = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=30d&includePrePost=false`;
+    const url30 = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=60d&includePrePost=false`;
     const [res5, res30] = await Promise.all([tryFetch(url5), tryFetch(url30)]);
     const json5  = await res5.json();
     const json30 = await res30.json();
@@ -293,7 +303,7 @@ async function fetchTicker(ticker) {
     // RSI semanal(14): llamada separada con interval=1wk
     let rsiWeekly = null;
     try {
-      const urlW = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=52wk&includePrePost=false`;
+      const urlW = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=2y&includePrePost=false`;
       const resW = await tryFetch(urlW);
       const jsonW = await resW.json();
       const closesW = jsonW?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c=>c!=null)||[];
