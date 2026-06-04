@@ -301,39 +301,42 @@ async function tryFetch(url) {
   throw new Error('Sin conexión');
 }
 
-async function fetchTicker(ticker) {
+async function fetchTicker(ticker, includeRSI=false) {
   try {
     const FKEY = 'd8grcphr01qhjpmpb2rgd8grcphr01qhjpmpb2s0';
     const now = Math.floor(Date.now()/1000);
     const from1y = now - 365*24*3600;
     const from2y = now - 2*365*24*3600;
 
-    // Finnhub: sin proxy, sin cache, precio real
-    const [resQ, resD, resW] = await Promise.all([
-      fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FKEY}`),
-      fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from1y}&to=${now}&token=${FKEY}`),
-      fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=W&from=${from2y}&to=${now}&token=${FKEY}`)
-    ]);
-
-    const quote   = await resQ.json();
-    const candleD = await resD.json();
-    const candleW = await resW.json();
-
+    // Siempre: quote para precio del dia (1 call)
+    const resQ = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FKEY}`);
+    const quote = await resQ.json();
     if (!quote || quote.c == null || quote.c === 0) throw new Error('Sin datos');
 
     const price     = quote.c;
     const prevClose = quote.pc;
     const dayPct    = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
 
-    // weekPct: cierre de hace 5 sesiones
-    const closesD   = (candleD?.c || []).filter(c => c != null);
-    const weekStart = closesD.length >= 6 ? closesD[closesD.length-6] : (closesD[0] || null);
-    const weekPct   = weekStart ? ((price - weekStart) / weekStart) * 100 : null;
+    // weekPct desde cache si existe
+    let weekPct = dataCache[ticker]?.weekPct ?? null;
+    let rsi = dataCache[ticker]?.rsi ?? null;
+    let rsiWeekly = dataCache[ticker]?.rsiWeekly ?? null;
 
-    // RSI diario y semanal
-    const rsi       = calcRSI([...closesD, price], 14);
-    const closesW   = (candleW?.c || []).filter(c => c != null);
-    const rsiWeekly = calcRSI([...closesW, price], 14);
+    // Candles solo si es necesario (primer carga o modo RSI activo)
+    if (includeRSI || weekPct === null) {
+      const [resD, resW] = await Promise.all([
+        fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from1y}&to=${now}&token=${FKEY}`),
+        fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=W&from=${from2y}&to=${now}&token=${FKEY}`)
+      ]);
+      const candleD = await resD.json();
+      const candleW = await resW.json();
+      const closesD = (candleD?.c || []).filter(c => c != null);
+      const closesW = (candleW?.c || []).filter(c => c != null);
+      const weekStart = closesD.length >= 6 ? closesD[closesD.length-6] : (closesD[0] || null);
+      weekPct   = weekStart ? ((price - weekStart) / weekStart) * 100 : null;
+      rsi       = calcRSI([...closesD, price], 14);
+      rsiWeekly = calcRSI([...closesW, price], 14);
+    }
 
     return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, name: ticker, ok: true };
   } catch(e) {
@@ -343,19 +346,24 @@ async function fetchTicker(ticker) {
 }
 
 
+let _firstLoad = true;
 async function refreshAll() {
   updateMarketPill();
   renderGrid(true);
-  // Procesar en batches de 15 para respetar rate limit de Finnhub (60 calls/min)
-  // 15 tickers x 3 calls = 45 calls por batch, con pausa entre batches
-  const batchSize = 15;
+  // Primera carga: incluir candles para RSI y weekPct (3 calls/ticker, batches de 15)
+  // Refrescos siguientes: solo quote (1 call/ticker, todos en paralelo)
+  const needCandles = _firstLoad;
+  const batchSize = needCandles ? 15 : 50;
+  const delay = needCandles ? 1200 : 0;
+
   for (let i = 0; i < tickers.length; i += batchSize) {
     const batch = tickers.slice(i, i + batchSize);
-    const results = await Promise.all(batch.map(t => fetchTicker(t)));
-    results.forEach(r => { dataCache[r.ticker] = r; });
+    const results = await Promise.all(batch.map(t => fetchTicker(t, needCandles)));
+    results.forEach(r => { if (r.ok) dataCache[r.ticker] = r; });
     renderGrid(false);
-    if (i + batchSize < tickers.length) await new Promise(r => setTimeout(r, 1200));
+    if (delay && i + batchSize < tickers.length) await new Promise(r => setTimeout(r, delay));
   }
+  _firstLoad = false;
   document.getElementById('last-update').textContent =
     'Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
   renderGrid(false);
