@@ -202,7 +202,46 @@ function setView(v) {
   document.getElementById('rsi-period-group').style.display = v==='rsi' ? '' : 'none';
   document.getElementById('legend-price').style.display = v==='price' ? 'flex' : 'none';
   document.getElementById('legend-rsi').style.display = v==='rsi' ? 'flex' : 'none';
-  renderGrid();
+  // Si algún ticker no tiene RSI, cargar candles
+  const missingRSI = tickers.some(t => !dataCache[t]?.rsi);
+  if (v === 'rsi' && missingRSI) {
+    loadCandles();
+  } else {
+    renderGrid();
+  }
+}
+
+async function loadCandles() {
+  const FKEY = 'd8grcphr01qhjpmpb2rgd8grcphr01qhjpmpb2s0';
+  const now = Math.floor(Date.now()/1000);
+  const from1y = now - 365*24*3600;
+  const from2y = now - 2*365*24*3600;
+  const batchSize = 15;
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const batch = tickers.slice(i, i + batchSize).filter(t => !dataCache[t]?.rsi);
+    if (batch.length === 0) continue;
+    await Promise.all(batch.map(async ticker => {
+      try {
+        const [resD, resW] = await Promise.all([
+          fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from1y}&to=${now}&token=${FKEY}`),
+          fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=W&from=${from2y}&to=${now}&token=${FKEY}`)
+        ]);
+        const candleD = await resD.json();
+        const candleW = await resW.json();
+        const closesD = (candleD?.c || []).filter(c => c != null);
+        const closesW = (candleW?.c || []).filter(c => c != null);
+        const price = dataCache[ticker]?.price || 0;
+        const weekStart = closesD.length >= 6 ? closesD[closesD.length-6] : (closesD[0] || null);
+        if (dataCache[ticker]) {
+          dataCache[ticker].weekPct = weekStart ? ((price - weekStart) / weekStart) * 100 : null;
+          dataCache[ticker].rsi = calcRSI([...closesD, price], 14);
+          dataCache[ticker].rsiWeekly = calcRSI([...closesW, price], 14);
+        }
+      } catch(e) { console.warn(ticker, e.message); }
+    }));
+    renderGrid(false);
+    if (i + batchSize < tickers.length) await new Promise(r => setTimeout(r, 1200));
+  }
 }
 
 function setRsiPeriod(p) {
@@ -314,8 +353,9 @@ async function fetchTicker(ticker, includeRSI=false) {
     if (!quote || quote.c == null || quote.c === 0) throw new Error('Sin datos');
 
     const price     = quote.c;
-    const prevClose = quote.pc;
-    const dayPct    = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
+    const prevClose = quote.pc || quote.o || null;  // pc=previous close, o=open como fallback
+    const dayPct    = prevClose && prevClose !== price ? ((price - prevClose) / prevClose) * 100 : null;
+    console.log(ticker, {c: quote.c, pc: quote.pc, o: quote.o, dp: quote.dp, d: quote.d});
 
     // weekPct desde cache si existe
     let weekPct = dataCache[ticker]?.weekPct ?? null;
