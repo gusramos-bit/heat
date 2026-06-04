@@ -114,6 +114,7 @@
 <script>
 const DEFAULT_TICKERS = ['ASTS','BMNR','CIFR','CLSK','COIN','DRAM','ENPH','EOSE','GGAL','HIMS','HOOD','IONQ','IREN','KEEL','LAC','MARA','MSTR','NBIS','NU','NVTS','OKLO','ONDS','OSCR','PAGS','POET','RGTI','RIVN','RKLB','SOFI','TEM','VIST','VST','YPF'];
 const STORAGE_KEY = 'heatmap_v4';
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzxSMyHXm9soBrD-_crWGROtYQ-5OxsvyJ1swR_akgeMe7yq2ox7NL40TT7z7TzShQ/exec';
 const STORAGE_KEY_OLD = 'heatmap_v3';
 const STORAGE_KEY_REMOVED = 'heatmap_v4_removed';
 
@@ -126,19 +127,52 @@ const PROXIES = [
   { name:'crossorigin.me', wrap:u=>`https://crossorigin.me/${u}` },
 ];
 
-// Migrar desde v3 si existe y fusionar con defaults respetando eliminados
-const _saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY_OLD);
-const _stored = JSON.parse(_saved||'null') || [];
-const _removed = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_REMOVED)||'[]'));
-const _merged = [...new Set([..._stored, ...DEFAULT_TICKERS])].filter(t => !_removed.has(t));
-let tickers = _merged.sort();
+// Tickers se cargan desde Google Sheets al iniciar
+let tickers = [];
 let metric = 'day';
 let view = 'price'; // 'price' | 'rsi'
 let rsiPeriod = 'daily';
 let dataCache = {};
 let activeProxyIdx = null;
 
-function saveTickers() { tickers.sort(); localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers)); }
+function saveTickers() {
+  tickers.sort();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
+}
+
+async function sheetsAdd(ticker) {
+  try {
+    await fetch(SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'add', ticker }),
+    });
+  } catch(e) { console.warn('Sheets add error', e); }
+}
+
+async function sheetsRemove(ticker) {
+  try {
+    await fetch(SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'remove', ticker }),
+    });
+  } catch(e) { console.warn('Sheets remove error', e); }
+}
+
+async function loadFromSheets() {
+  try {
+    const res = await fetch(SHEETS_URL);
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      tickers = data.sort();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
+      return true;
+    }
+  } catch(e) { console.warn('Sheets load error', e); }
+  // Fallback a localStorage
+  const saved = localStorage.getItem(STORAGE_KEY);
+  tickers = (JSON.parse(saved||'null') || [...DEFAULT_TICKERS]).sort();
+  return false;
+}
 
 function isMarketOpen() {
   const now = new Date();
@@ -385,6 +419,7 @@ async function addTicker() {
   localStorage.setItem(STORAGE_KEY_REMOVED, JSON.stringify([...removed]));
   tickers.push(raw);
   saveTickers();
+  sheetsAdd(raw);
   renderGrid(false);
   const d = await fetchTicker(raw);
   dataCache[raw]=d;
@@ -395,11 +430,8 @@ async function addTicker() {
 function removeTicker(ticker) {
   tickers=tickers.filter(t=>t!==ticker);
   delete dataCache[ticker];
-  // Guardar en lista de eliminados para que no vuelva con el merge
-  const removed = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_REMOVED)||'[]'));
-  removed.add(ticker);
-  localStorage.setItem(STORAGE_KEY_REMOVED, JSON.stringify([...removed]));
   saveTickers();
+  sheetsRemove(ticker);
   renderGrid(false);
   showToast(`${ticker} eliminado`);
 }
@@ -412,7 +444,11 @@ function showToast(msg) {
 
 updateMarketPill();
 setInterval(updateMarketPill, 30000);
-refreshAll();
+// Cargar tickers desde Google Sheets, luego iniciar
+loadFromSheets().then(() => {
+  renderGrid(false);
+  refreshAll();
+});
 setInterval(refreshAll, 60000);
 </script>
 </body>
