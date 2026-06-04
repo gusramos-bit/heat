@@ -270,9 +270,8 @@ async function tryFetch(url) {
 async function fetchTicker(ticker) {
   try {
     // Dos llamadas en paralelo: 5d para precios del dia, 30d para RSI
-    const ts = Date.now();
-    const url5  = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d&includePrePost=false&_=${ts}`;
-    const url30 = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y&includePrePost=false&_=${ts}`;
+    const url5  = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d&includePrePost=false`;
+    const url30 = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y&includePrePost=false`;
     const [res5, res30] = await Promise.all([tryFetch(url5), tryFetch(url30)]);
     const json5  = await res5.json();
     const json30 = await res30.json();
