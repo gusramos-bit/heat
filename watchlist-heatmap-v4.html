@@ -153,30 +153,35 @@ function calcRSI(closes, period=14) {
 // ── FETCH ──────────────────────────────────────────────
 async function fetchTicker(ticker) {
   try {
+    // range=1d interval=1m para precio en tiempo real
+    // range=1y para RSI y weekPct
+    // range=2y semanal para RSI semanal
+    const url1m = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1m&range=1d`;
     const url1y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
     const url2y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=2y`;
-    const [r1y, r2y] = await Promise.all([tryFetch(url1y), tryFetch(url2y)]);
-    const [j1y, j2y] = await Promise.all([r1y.json(), r2y.json()]);
+    const [r1m, r1y, r2y] = await Promise.all([tryFetch(url1m), tryFetch(url1y), tryFetch(url2y)]);
+    const [j1m, j1y, j2y] = await Promise.all([r1m.json(), r1y.json(), r2y.json()]);
 
-    const meta  = j1y?.chart?.result?.[0]?.meta;
-    if (!meta) throw new Error('sin meta');
-    const price = meta.regularMarketPrice;
-    const c1y   = j1y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
-    const c2y   = j2y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
+    // Precio actual desde minutos (no cacheado por proxy)
+    const meta1m = j1m?.chart?.result?.[0]?.meta;
+    const meta1y = j1y?.chart?.result?.[0]?.meta;
+    if (!meta1y) throw new Error('sin meta');
 
-    // dayPct: regularMarketChangePercent o calcular desde anteultimo close de 1y
-    const dayPct = (meta.regularMarketChangePercent != null && meta.regularMarketChangePercent !== 0)
-      ? meta.regularMarketChangePercent
-      : (c1y.length >= 1 ? ((price - c1y[c1y.length-1]) / c1y[c1y.length-1]) * 100 : null);
+    // regularMarketPrice del 1m es el precio mas reciente
+    const price     = meta1m?.regularMarketPrice || meta1y.regularMarketPrice;
+    const prevClose = meta1m?.chartPreviousClose || meta1y.chartPreviousClose;
+    const dayPct    = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
 
-    // weekPct: cierre de hace 5 sesiones dentro de c1y
+    const c1y = j1y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
+    const c2y = j2y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
+
     const weekStart = c1y.length>=6 ? c1y[c1y.length-6] : null;
     const weekPct   = weekStart ? ((price-weekStart)/weekStart)*100 : null;
 
     return {ticker, price, dayPct, weekPct,
       rsi: calcRSI([...c1y, price], 14),
       rsiWeekly: calcRSI([...c2y, price], 14),
-      name: meta.shortName||ticker, ok:true};
+      name: meta1y.shortName||ticker, ok:true};
   } catch(e) {
     return {ticker, price:null, dayPct:null, weekPct:null, rsi:null, rsiWeekly:null, name:ticker, ok:false};
   }
