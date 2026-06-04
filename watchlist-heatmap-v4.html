@@ -9,9 +9,12 @@
   :root { --bg:#0a0a0f; --surface:#12121a; --border:#1e1e2e; --text:#e2e2f0; --text-muted:#6b6b8a; --accent:#7c6fff; }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; min-height:100vh; padding:24px; }
-  header { display:flex; align-items:baseline; gap:16px; margin-bottom:24px; }
+  header { display:flex; align-items:center; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
   h1 { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; letter-spacing:-0.5px; }
   .subtitle { font-size:10px; color:var(--text-muted); letter-spacing:1px; text-transform:uppercase; }
+  .market-pill { font-size:10px; padding:3px 10px; border-radius:20px; font-weight:600; }
+  .market-open { background:#1b4332; color:#00e676; }
+  .market-closed { background:#2d1b1b; color:#ff6b6b; }
   .controls { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
   .toggle-group { display:flex; background:var(--surface); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
   .toggle-btn { padding:7px 16px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; border:none; cursor:pointer; background:transparent; color:var(--text-muted); transition:all 0.15s; }
@@ -19,7 +22,7 @@
   .btn { padding:7px 16px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:var(--surface); color:var(--text); transition:all 0.15s; }
   .btn:hover { border-color:var(--accent); color:var(--accent); }
   .last-update { margin-left:auto; font-size:10px; color:var(--text-muted); }
-  .add-bar { display:flex; gap:8px; margin-bottom:14px; align-items:center; }
+  .add-bar { display:flex; gap:8px; margin-bottom:16px; align-items:center; }
   .add-bar input { background:var(--surface); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:7px 12px; width:130px; text-transform:uppercase; outline:none; transition:border-color 0.15s; }
   .add-bar input:focus { border-color:var(--accent); }
   .add-bar input::placeholder { color:var(--text-muted); text-transform:none; }
@@ -31,9 +34,7 @@
   .legend-rsi { display:none; align-items:center; gap:8px; margin-bottom:16px; font-size:10px; color:var(--text-muted); }
   .legend-rsi-bar { width:200px; height:6px; border-radius:3px; background:linear-gradient(to right,#00e676,#888,#ff1744); }
   .grid { display:flex; flex-wrap:wrap; gap:6px; }
-
-  /* TILE */
-  .tile { position:relative; border-radius:8px; padding:14px 12px 10px; transition:transform 0.12s,box-shadow 0.12s; flex:0 0 130px; width:130px; overflow:hidden; border:1px solid transparent; cursor:default; }
+  .tile { position:relative; border-radius:8px; padding:14px 12px 10px; transition:transform 0.12s,box-shadow 0.12s; flex:0 0 130px; width:130px; overflow:hidden; border:1px solid transparent; }
   .tile:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.4); border-color:rgba(255,255,255,0.15); z-index:2; }
   .tile .remove-btn { position:absolute; top:5px; right:6px; font-size:11px; color:rgba(255,255,255,0.3); cursor:pointer; display:none; background:none; border:none; }
   .tile:hover .remove-btn { display:block; }
@@ -42,34 +43,24 @@
   .pct { font-size:13px; font-weight:700; color:#fff; margin-bottom:4px; }
   .price { font-size:10px; color:rgba(255,255,255,0.65); }
   .company-name { font-size:9px; color:rgba(255,255,255,0.4); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; }
-
-  /* RSI tile content */
   .rsi-val { font-size:22px; font-weight:700; font-family:'JetBrains Mono',monospace; color:#fff; margin-bottom:4px; line-height:1; }
   .rsi-label { font-size:9px; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
   .rsi-bar-wrap { width:100%; height:4px; background:rgba(0,0,0,0.3); border-radius:2px; margin-bottom:4px; }
   .rsi-bar-fill { height:4px; border-radius:2px; background:rgba(255,255,255,0.8); }
   .rsi-zones { display:flex; justify-content:space-between; font-size:8px; color:rgba(255,255,255,0.4); }
-
   .tile.loading { background:var(--surface) !important; border-color:var(--border) !important; animation:pulse 1.2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
   .toast { position:fixed; bottom:24px; right:24px; background:var(--accent); color:#fff; padding:10px 18px; border-radius:8px; font-size:12px; opacity:0; transition:opacity 0.2s; pointer-events:none; }
   .toast.show { opacity:1; }
   .empty { color:var(--text-muted); font-size:12px; padding:40px; text-align:center; width:100%; }
-
-  /* market status */
-  .market-pill { font-size:10px; padding:3px 10px; border-radius:20px; font-weight:600; letter-spacing:0.5px; }
-  .market-open { background:#1b4332; color:#00e676; }
-  .market-closed { background:#2d1b1b; color:#ff6b6b; }
 </style>
 </head>
 <body>
-
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Finnhub</span>
+  <span class="subtitle">Live · Yahoo Finance</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
-
 <div class="controls">
   <div class="toggle-group">
     <button class="toggle-btn active" id="btn-price" onclick="setView('price')">Precios</button>
@@ -80,429 +71,266 @@
     <button class="toggle-btn" id="btn-week" onclick="setMetric('week')">Semana %</button>
   </div>
   <div class="toggle-group" id="rsi-period-group" style="display:none">
-    <button class="toggle-btn active" id="btn-rsi14" onclick="setRsiPeriod('daily')">RSI Diario</button>
-    <button class="toggle-btn" id="btn-rsi7" onclick="setRsiPeriod('weekly')">RSI Semanal</button>
+    <button class="toggle-btn active" id="btn-rsi-daily" onclick="setRsiPeriod('daily')">RSI Diario</button>
+    <button class="toggle-btn" id="btn-rsi-weekly" onclick="setRsiPeriod('weekly')">RSI Semanal</button>
   </div>
   <button class="btn" onclick="refreshAll()">↻ Actualizar</button>
   <span class="last-update" id="last-update">—</span>
 </div>
-
 <div class="add-bar">
   <input type="text" id="ticker-input" placeholder="Agregar ticker..." maxlength="10" onkeydown="if(event.key==='Enter') addTicker()">
   <button class="btn-add" onclick="addTicker()">+ Agregar</button>
 </div>
-
-<div class="proxy-status" id="proxy-status">Via <span>Finnhub</span></div>
-
+<div class="proxy-status" id="proxy-status">Conectando...</div>
 <div class="legend" id="legend-price">
-  <span>−10%</span>
-  <div class="legend-bar"></div>
-  <span>+10%</span>
+  <span>−10%</span><div class="legend-bar"></div><span>+10%</span>
 </div>
 <div class="legend-rsi" id="legend-rsi">
   <span style="color:#00e676">Sobrevendido &lt;30</span>
   <div class="legend-rsi-bar"></div>
   <span style="color:#ff6b6b">Sobrecomprado &gt;70</span>
 </div>
-
-<div class="grid" id="grid">
-  <div class="empty">Cargando datos...</div>
-</div>
-
+<div class="grid" id="grid"><div class="empty">Cargando...</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
-const DEFAULT_TICKERS = ['ASTS','BMNR','CIFR','CLSK','COIN','DRAM','ENPH','EOSE','GGAL','HIMS','HOOD','IONQ','IREN','KEEL','LAC','MARA','MSTR','NBIS','NU','NVTS','OKLO','ONDS','OSCR','PAGS','POET','RGTI','RIVN','RKLB','SOFI','TEM','VIST','VST','YPF'];
-const STORAGE_KEY = 'heatmap_v4';
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzxSMyHXm9soBrD-_crWGROtYQ-5OxsvyJ1swR_akgeMe7yq2ox7NL40TT7z7TzShQ/exec';
-const STORAGE_KEY_OLD = 'heatmap_v3';
-const STORAGE_KEY_REMOVED = 'heatmap_v4_removed';
-
+const DEFAULT_TICKERS = ['AAOI','APLD','ASTS','BE','BMNR','CIFR','CLSK','COIN','CRWV','DRAM','ENPH','EOSE','HIMS','HOOD','IBIT','INFQ','IONQ','IREN','KEEL','LAC','MARA','MP','MSFT','MSTR','NBIS','NOK','NU','NVTS','OKLO','ONDS','OSCR','PAGS','PLTR','POET','RGTI','RIOT','RIVN','RKLB','SNDK','SOFI','SPOT','TE','TEM','UAMY','UNH','VIST','VST','YPF','ZETA'];
+const STORAGE_KEY = 'heatmap_v4';
 const PROXIES = [
   { name:'corsproxy.io',   wrap:u=>`https://corsproxy.io/?${encodeURIComponent(u)}` },
   { name:'allorigins',     wrap:u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
   { name:'codetabs',       wrap:u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}` },
-  { name:'jsonp.afeld',    wrap:u=>`https://jsonp.afeld.me/?url=${encodeURIComponent(u)}` },
-  { name:'cors.eu.org',    wrap:u=>`https://cors.eu.org/${u}` },
-  { name:'crossorigin.me', wrap:u=>`https://crossorigin.me/${u}` },
 ];
 
-// Tickers se cargan desde Google Sheets al iniciar
 let tickers = [];
 let metric = 'day';
-let view = 'price'; // 'price' | 'rsi'
+let view = 'price';
 let rsiPeriod = 'daily';
 let dataCache = {};
-let activeProxyIdx = null;
+let activeProxy = null;
 
-function saveTickers() {
-  tickers.sort();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
-}
-
-async function sheetsAdd(ticker) {
-  try {
-    await fetch(SHEETS_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'add', ticker }),
-    });
-  } catch(e) { console.warn('Sheets add error', e); }
-}
-
-async function sheetsRemove(ticker) {
-  try {
-    await fetch(SHEETS_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'remove', ticker }),
-    });
-  } catch(e) { console.warn('Sheets remove error', e); }
-}
-
-async function loadFromSheets() {
-  try {
-    const res = await fetch(SHEETS_URL);
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-      tickers = data.sort();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
-      return true;
-    }
-  } catch(e) { console.warn('Sheets load error', e); }
-  // Fallback a localStorage
-  const saved = localStorage.getItem(STORAGE_KEY);
-  tickers = (JSON.parse(saved||'null') || [...DEFAULT_TICKERS]).sort();
-  return false;
-}
-
-function isMarketOpen() {
-  const now = new Date();
-  const ny = new Date(now.toLocaleString('en-US', {timeZone:'America/New_York'}));
-  const day = ny.getDay();
-  const h = ny.getHours(), m = ny.getMinutes();
-  const mins = h*60+m;
-  return day>=1 && day<=5 && mins>=570 && mins<960; // 9:30–16:00
-}
-
-function updateMarketPill() {
-  const pill = document.getElementById('market-pill');
-  if (isMarketOpen()) {
-    pill.textContent = '● Mercado abierto';
-    pill.className = 'market-pill market-open';
-  } else {
-    pill.textContent = '● Mercado cerrado';
-    pill.className = 'market-pill market-closed';
+// ── PROXY ──────────────────────────────────────────────
+async function tryFetch(url) {
+  if (activeProxy !== null) {
+    try {
+      const r = await fetch(PROXIES[activeProxy].wrap(url), {signal: AbortSignal.timeout(8000)});
+      if (r.ok) return r;
+      activeProxy = null;
+    } catch(e) { activeProxy = null; }
   }
-}
-
-function setView(v) {
-  view = v;
-  document.getElementById('btn-price').classList.toggle('active', v==='price');
-  document.getElementById('btn-rsi').classList.toggle('active', v==='rsi');
-  document.getElementById('metric-group').style.display = v==='price' ? '' : 'none';
-  document.getElementById('rsi-period-group').style.display = v==='rsi' ? '' : 'none';
-  document.getElementById('legend-price').style.display = v==='price' ? 'flex' : 'none';
-  document.getElementById('legend-rsi').style.display = v==='rsi' ? 'flex' : 'none';
-  // Si algún ticker no tiene RSI, cargar candles
-  const missingRSI = tickers.some(t => !dataCache[t]?.rsi);
-  if (v === 'rsi' && missingRSI) {
-    loadCandles();
-  } else {
-    renderGrid();
+  for (let i = 0; i < PROXIES.length; i++) {
+    try {
+      const r = await fetch(PROXIES[i].wrap(url), {signal: AbortSignal.timeout(8000)});
+      if (r.ok) {
+        activeProxy = i;
+        document.getElementById('proxy-status').innerHTML = `Via <span>${PROXIES[i].name}</span>`;
+        return r;
+      }
+    } catch(e) { continue; }
   }
+  throw new Error('Sin proxy');
 }
 
-async function loadCandles() {
-  const FKEY = 'd8grcphr01qhjpmpb2rgd8grcphr01qhjpmpb2s0';
-  const now = Math.floor(Date.now()/1000);
-  const from1y = now - 365*24*3600;
-  const from2y = now - 2*365*24*3600;
-  const batchSize = 15;
-  for (let i = 0; i < tickers.length; i += batchSize) {
-    const batch = tickers.slice(i, i + batchSize).filter(t => !dataCache[t]?.rsi);
-    if (batch.length === 0) continue;
-    await Promise.all(batch.map(async ticker => {
-      try {
-        const [resD, resW] = await Promise.all([
-          fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from1y}&to=${now}&token=${FKEY}`),
-          fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=W&from=${from2y}&to=${now}&token=${FKEY}`)
-        ]);
-        const candleD = await resD.json();
-        const candleW = await resW.json();
-        const closesD = (candleD?.c || []).filter(c => c != null);
-        const closesW = (candleW?.c || []).filter(c => c != null);
-        const price = dataCache[ticker]?.price || 0;
-        const weekStart = closesD.length >= 6 ? closesD[closesD.length-6] : (closesD[0] || null);
-        if (dataCache[ticker]) {
-          dataCache[ticker].weekPct = weekStart ? ((price - weekStart) / weekStart) * 100 : null;
-          dataCache[ticker].rsi = calcRSI([...closesD, price], 14);
-          dataCache[ticker].rsiWeekly = calcRSI([...closesW, price], 14);
-        }
-      } catch(e) { console.warn(ticker, e.message); }
-    }));
-    renderGrid(false);
-    if (i + batchSize < tickers.length) await new Promise(r => setTimeout(r, 1200));
-  }
-}
-
-function setRsiPeriod(p) {
-  rsiPeriod = p;
-  document.getElementById('btn-rsi14').classList.toggle('active', p==='daily');
-  document.getElementById('btn-rsi7').classList.toggle('active', p==='weekly');
-  renderGrid();
-}
-
-function setMetric(m) {
-  metric = m;
-  document.getElementById('btn-day').classList.toggle('active', m==='day');
-  document.getElementById('btn-week').classList.toggle('active', m==='week');
-  renderGrid();
-}
-
-function getColorPrice(pct) {
-  const c = Math.max(-12, Math.min(12, pct));
-  if (c>=0) { const t=Math.min(c/10,1); return `rgb(${Math.round(27*(1-t))},${Math.round(67+163*t)},${Math.round(50+68*t)})`; }
-  else { const t=Math.min(Math.abs(c)/10,1); return `rgb(${Math.round(30+225*t)},${Math.round(18+5*t)},${Math.round(25+43*t)})`; }
-}
-
-function getColorRSI(rsi) {
-  if (rsi <= 30) {
-    const t = rsi/30;
-    return `rgb(${Math.round(0+27*t)},${Math.round(150+80*(1-t))},${Math.round(80+40*(1-t))})`;
-  } else if (rsi >= 70) {
-    const t = (rsi-70)/30;
-    return `rgb(${Math.round(180+75*t)},${Math.round(40*(1-t))},${Math.round(40*(1-t))})`;
-  } else {
-    const t = (rsi-30)/40;
-    return `rgb(${Math.round(60+60*t)},${Math.round(60+20*(1-t))},${Math.round(80+20*t)})`;
-  }
-}
-
+// ── RSI Wilder ─────────────────────────────────────────
 function calcRSI(closes, period=14) {
   if (closes.length < period+2) return null;
-  // Metodo Wilder (RMA) - estandar original del RSI
-  let gains = 0, losses = 0;
+  let gains=0, losses=0;
   for (let i=1; i<=period; i++) {
-    const diff = closes[i] - closes[i-1];
-    if (diff > 0) gains += diff;
-    else losses += Math.abs(diff);
+    const d = closes[i]-closes[i-1];
+    if (d>0) gains+=d; else losses+=Math.abs(d);
   }
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
+  let ag=gains/period, al=losses/period;
   for (let i=period+1; i<closes.length; i++) {
-    const diff = closes[i] - closes[i-1];
-    avgGain = (avgGain * (period-1) + (diff > 0 ? diff : 0)) / period;
-    avgLoss = (avgLoss * (period-1) + (diff < 0 ? Math.abs(diff) : 0)) / period;
+    const d = closes[i]-closes[i-1];
+    ag = (ag*(period-1)+(d>0?d:0))/period;
+    al = (al*(period-1)+(d<0?Math.abs(d):0))/period;
   }
-  if (avgLoss === 0) return 100;
-  return 100 - (100 / (1 + avgGain/avgLoss));
+  if (al===0) return 100;
+  return 100-(100/(1+ag/al));
 }
 
-function fmtPct(v) {
-  if (v==null||isNaN(v)) return '—';
-  return (v>=0?'+':'')+v.toFixed(2)+'%';
-}
-
-async function tryFetch(url) {
-  const timeout = 6000;
-  // Intentar proxy activo primero
-  if (activeProxyIdx !== null) {
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), timeout);
-      const res = await fetch(PROXIES[activeProxyIdx].wrap(url), {signal: ctrl.signal});
-      clearTimeout(tid);
-      if (res.ok) return res;
-      activeProxyIdx = null; // falló, resetear
-    } catch(e) { activeProxyIdx = null; }
-  }
-  // Probar todos en paralelo y usar el primero que responda
-  const results = await Promise.allSettled(
-    PROXIES.map((p, i) =>
-      new Promise(async (resolve, reject) => {
-        try {
-          const ctrl = new AbortController();
-          const tid = setTimeout(() => ctrl.abort(), timeout);
-          const res = await fetch(p.wrap(url), {signal: ctrl.signal});
-          clearTimeout(tid);
-          if (res.ok) resolve({res, i});
-          else reject(new Error('not ok'));
-        } catch(e) { reject(e); }
-      })
-    )
-  );
-  for (const r of results) {
-    if (r.status === 'fulfilled') {
-      activeProxyIdx = r.value.i;
-      document.getElementById('proxy-status').innerHTML = `Via <span>${PROXIES[r.value.i].name}</span>`;
-      return r.value.res;
-    }
-  }
-  throw new Error('Sin conexión');
-}
-
-async function fetchTicker(ticker, includeRSI=false) {
+// ── FETCH ──────────────────────────────────────────────
+async function fetchTicker(ticker) {
   try {
-    const FKEY = 'd8grcphr01qhjpmpb2rgd8grcphr01qhjpmpb2s0';
-    const now = Math.floor(Date.now()/1000);
-    const from1y = now - 365*24*3600;
-    const from2y = now - 2*365*24*3600;
+    const url5 = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d`;
+    const url1y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
+    const url2y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=2y`;
+    const [r5, r1y, r2y] = await Promise.all([tryFetch(url5), tryFetch(url1y), tryFetch(url2y)]);
+    const [j5, j1y, j2y] = await Promise.all([r5.json(), r1y.json(), r2y.json()]);
 
-    // Siempre: quote para precio del dia (1 call)
-    const resQ = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FKEY}`);
-    const quote = await resQ.json();
-    if (!quote || quote.c == null || quote.c === 0) throw new Error('Sin datos');
+    const meta   = j5?.chart?.result?.[0]?.meta;
+    if (!meta) throw new Error('sin meta');
+    const price  = meta.regularMarketPrice;
 
-    const price  = quote.c;
-    const dayPct = quote.dp ?? null;  // dp = day percent, calculado por Finnhub directamente
+    const c5  = j5?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
+    const c1y = j1y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
+    const c2y = j2y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
 
-    // weekPct desde cache si existe
-    let weekPct = dataCache[ticker]?.weekPct ?? null;
-    let rsi = dataCache[ticker]?.rsi ?? null;
-    let rsiWeekly = dataCache[ticker]?.rsiWeekly ?? null;
+    const dayPct  = meta.regularMarketChangePercent ?? (c5.length>=2 ? ((price-c5[c5.length-2])/c5[c5.length-2])*100 : null);
+    const weekPct = c5.length>0 ? ((price-c5[0])/c5[0])*100 : null;
+    const rsi     = calcRSI([...c1y, price], 14);
+    const rsiWeekly = calcRSI([...c2y, price], 14);
+    const name    = meta.shortName || ticker;
 
-    // Candles solo si es necesario (primer carga o modo RSI activo)
-    if (includeRSI || weekPct === null) {
-      const [resD, resW] = await Promise.all([
-        fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from1y}&to=${now}&token=${FKEY}`),
-        fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=W&from=${from2y}&to=${now}&token=${FKEY}`)
-      ]);
-      const candleD = await resD.json();
-      const candleW = await resW.json();
-      const closesD = (candleD?.c || []).filter(c => c != null);
-      const closesW = (candleW?.c || []).filter(c => c != null);
-      const weekStart = closesD.length >= 6 ? closesD[closesD.length-6] : (closesD[0] || null);
-      weekPct   = weekStart ? ((price - weekStart) / weekStart) * 100 : null;
-      rsi       = calcRSI([...closesD, price], 14);
-      rsiWeekly = calcRSI([...closesW, price], 14);
-    }
-
-    return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, name: ticker, ok: true };
+    return {ticker, price, dayPct, weekPct, rsi, rsiWeekly, name, ok:true};
   } catch(e) {
-    console.warn(ticker, e.message);
-    return { ticker, price:null, dayPct:null, weekPct:null, rsi:null, ok:false };
+    return {ticker, price:null, dayPct:null, weekPct:null, rsi:null, rsiWeekly:null, name:ticker, ok:false};
   }
 }
 
-
-let _firstLoad = true;
-async function refreshAll() {
-  updateMarketPill();
-  renderGrid(true);
-  // Primera carga: incluir candles para RSI y weekPct (3 calls/ticker, batches de 15)
-  // Refrescos siguientes: solo quote (1 call/ticker, todos en paralelo)
-  const needCandles = _firstLoad;
-  const batchSize = needCandles ? 15 : 50;
-  const delay = needCandles ? 1200 : 0;
-
-  for (let i = 0; i < tickers.length; i += batchSize) {
-    const batch = tickers.slice(i, i + batchSize);
-    const results = await Promise.all(batch.map(t => fetchTicker(t, needCandles)));
-    results.forEach(r => { if (r.ok) dataCache[r.ticker] = r; });
-    renderGrid(false);
-    if (delay && i + batchSize < tickers.length) await new Promise(r => setTimeout(r, delay));
-  }
-  _firstLoad = false;
-  document.getElementById('last-update').textContent =
-    'Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-  renderGrid(false);
+// ── COLOR ──────────────────────────────────────────────
+function colorPrice(p) {
+  const c=Math.max(-12,Math.min(12,p));
+  if (c>=0){const t=Math.min(c/10,1);return `rgb(${Math.round(27*(1-t))},${Math.round(67+163*t)},${Math.round(50+68*t)})`;}
+  else{const t=Math.min(Math.abs(c)/10,1);return `rgb(${Math.round(30+225*t)},${Math.round(18+5*t)},${Math.round(25+43*t)})`;}
 }
-
-function rsiLabel(rsi) {
-  if (rsi==null) return '';
-  if (rsi<=30) return 'Sobrevendido';
-  if (rsi>=70) return 'Sobrecomprado';
-  return 'Neutral';
+function colorRSI(r) {
+  if (r<=30){const t=r/30;return `rgb(${Math.round(0+27*t)},${Math.round(150+80*(1-t))},${Math.round(80+40*(1-t))})`;}
+  if (r>=70){const t=(r-70)/30;return `rgb(${Math.round(180+75*t)},${Math.round(40*(1-t))},${Math.round(40*(1-t))})`;}
+  const t=(r-30)/40;return `rgb(${Math.round(60+60*t)},${Math.round(60+20*(1-t))},${Math.round(80+20*t)})`;
 }
+function fmtPct(v){if(v==null||isNaN(v))return'—';return(v>=0?'+':'')+v.toFixed(2)+'%';}
+function rsiTag(r){if(r==null)return'';if(r<=30)return'Sobrevendido';if(r>=70)return'Sobrecomprado';return'Neutral';}
 
+// ── RENDER ─────────────────────────────────────────────
 function renderGrid(loading=false) {
   const grid = document.getElementById('grid');
-  if (!tickers.length) { grid.innerHTML='<div class="empty">Agregá tickers para empezar</div>'; return; }
-
+  if (!tickers.length){grid.innerHTML='<div class="empty">Agregá tickers</div>';return;}
   grid.innerHTML = tickers.map(ticker => {
     const d = dataCache[ticker];
-    if (loading||!d) {
-      return `<div class="tile loading">
-        <div class="ticker">${ticker}</div>
-        <div class="pct" style="color:var(--text-muted);font-size:10px">cargando…</div>
-      </div>`;
-    }
-    if (!d.ok) {
-      return `<div class="tile" style="background:#1a0e1e;border-color:#3a1a40">
-        <button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button>
-        <div class="ticker" style="color:#777">${ticker}</div>
-        <div class="pct" style="font-size:10px;color:#555">sin datos</div>
-      </div>`;
-    }
+    if (loading||!d) return `<div class="tile loading"><div class="ticker">${ticker}</div><div class="pct" style="color:var(--text-muted);font-size:10px">cargando…</div></div>`;
+    if (!d.ok) return `<div class="tile" style="background:#1a0e1e;border-color:#3a1a40"><button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button><div class="ticker" style="color:#777">${ticker}</div><div class="pct" style="font-size:10px;color:#555">sin datos</div></div>`;
 
     if (view==='rsi') {
       const rsi = rsiPeriod==='weekly' ? d.rsiWeekly : d.rsi;
-      const bg = rsi!=null ? getColorRSI(rsi) : 'var(--surface)';
-      const barW = rsi!=null ? rsi.toFixed(0) : 0;
+      const bg  = rsi!=null ? colorRSI(rsi) : 'var(--surface)';
       return `<div class="tile" style="background:${bg}">
         <button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button>
         <div class="ticker">${ticker}</div>
-        <div class="rsi-val">${rsi!=null ? rsi.toFixed(1) : '—'}</div>
-        <div class="rsi-label">RSI 14 ${rsiPeriod==='weekly'?'Semanal':'Diario'} · ${rsiLabel(rsi)}</div>
-        <div class="rsi-bar-wrap"><div class="rsi-bar-fill" style="width:${barW}%"></div></div>
+        <div class="rsi-val">${rsi!=null?rsi.toFixed(1):'—'}</div>
+        <div class="rsi-label">RSI 14 ${rsiPeriod==='weekly'?'Semanal':'Diario'} · ${rsiTag(rsi)}</div>
+        <div class="rsi-bar-wrap"><div class="rsi-bar-fill" style="width:${rsi||0}%"></div></div>
         <div class="rsi-zones"><span>0</span><span>30</span><span>70</span><span>100</span></div>
       </div>`;
     }
 
-    // VIEW: price
     const pct = metric==='day' ? d.dayPct : d.weekPct;
-    const bg = pct!=null ? getColorPrice(pct) : 'var(--surface)';
+    const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
     return `<div class="tile" style="background:${bg}">
       <button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button>
       <div class="ticker">${ticker}</div>
       <div class="pct">${fmtPct(pct)}</div>
-      <div class="price">${d.price ? '$'+d.price.toFixed(2) : ''}</div>
+      <div class="price">${d.price?'$'+d.price.toFixed(2):''}</div>
       <div class="company-name">${d.name}</div>
     </div>`;
   }).join('');
 }
 
-async function addTicker() {
-  const input = document.getElementById('ticker-input');
-  const raw = input.value.trim().toUpperCase();
-  if (!raw) return;
-  if (tickers.includes(raw)) { showToast(`${raw} ya está`); input.value=''; return; }
-  input.value='';
-  // Quitar de eliminados si estaba
-  const removed = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_REMOVED)||'[]'));
-  removed.delete(raw);
-  localStorage.setItem(STORAGE_KEY_REMOVED, JSON.stringify([...removed]));
-  tickers.push(raw);
-  saveTickers();
-  sheetsAdd(raw);
-  renderGrid(false);
-  const d = await fetchTicker(raw);
-  dataCache[raw]=d;
-  renderGrid(false);
-  showToast(d.ok ? `${raw} agregado` : `${raw}: sin datos`);
+// ── REFRESH ────────────────────────────────────────────
+async function refreshAll() {
+  updateMarketPill();
+  renderGrid(true);
+  // Batches de 5 para no saturar el proxy
+  const batchSize = 5;
+  for (let i=0; i<tickers.length; i+=batchSize) {
+    const batch = tickers.slice(i, i+batchSize);
+    const results = await Promise.all(batch.map(t=>fetchTicker(t)));
+    results.forEach(r=>{ dataCache[r.ticker]=r; });
+    renderGrid(false);
+    if (i+batchSize < tickers.length) await new Promise(r=>setTimeout(r,300));
+  }
+  document.getElementById('last-update').textContent =
+    'Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
 }
 
+// ── VIEWS ──────────────────────────────────────────────
+function setView(v) {
+  view=v;
+  document.getElementById('btn-price').classList.toggle('active',v==='price');
+  document.getElementById('btn-rsi').classList.toggle('active',v==='rsi');
+  document.getElementById('metric-group').style.display=v==='price'?'':'none';
+  document.getElementById('rsi-period-group').style.display=v==='rsi'?'':'none';
+  document.getElementById('legend-price').style.display=v==='price'?'flex':'none';
+  document.getElementById('legend-rsi').style.display=v==='rsi'?'flex':'none';
+  renderGrid();
+}
+function setMetric(m) {
+  metric=m;
+  document.getElementById('btn-day').classList.toggle('active',m==='day');
+  document.getElementById('btn-week').classList.toggle('active',m==='week');
+  renderGrid();
+}
+function setRsiPeriod(p) {
+  rsiPeriod=p;
+  document.getElementById('btn-rsi-daily').classList.toggle('active',p==='daily');
+  document.getElementById('btn-rsi-weekly').classList.toggle('active',p==='weekly');
+  renderGrid();
+}
+
+// ── MARKET PILL ────────────────────────────────────────
+function updateMarketPill() {
+  const ny=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const d=ny.getDay(), m=ny.getHours()*60+ny.getMinutes();
+  const open=d>=1&&d<=5&&m>=570&&m<960;
+  const pill=document.getElementById('market-pill');
+  pill.textContent=open?'● Mercado abierto':'● Mercado cerrado';
+  pill.className='market-pill '+(open?'market-open':'market-closed');
+}
+
+// ── TICKERS ────────────────────────────────────────────
+function saveTickers() {
+  tickers.sort();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
+}
+async function sheetsAdd(ticker) {
+  try { await fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({action:'add',ticker})}); } catch(e){}
+}
+async function sheetsRemove(ticker) {
+  try { await fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({action:'remove',ticker})}); } catch(e){}
+}
+async function loadFromSheets() {
+  try {
+    const res = await fetch(SHEETS_URL, {redirect:'follow'});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if (Array.isArray(data)&&data.length>0) {
+      tickers = data.sort();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
+      return;
+    }
+  } catch(e) { console.warn('Sheets:', e.message); }
+  const saved = localStorage.getItem(STORAGE_KEY);
+  tickers = (JSON.parse(saved||'null')||[...DEFAULT_TICKERS]).sort();
+}
+
+async function addTicker() {
+  const input=document.getElementById('ticker-input');
+  const raw=input.value.trim().toUpperCase();
+  if (!raw) return;
+  if (tickers.includes(raw)){showToast(`${raw} ya está`);input.value='';return;}
+  input.value='';
+  tickers.push(raw); saveTickers(); sheetsAdd(raw); renderGrid(false);
+  const d=await fetchTicker(raw);
+  dataCache[raw]=d; renderGrid(false);
+  showToast(d.ok?`${raw} agregado`:`${raw}: sin datos`);
+}
 function removeTicker(ticker) {
   tickers=tickers.filter(t=>t!==ticker);
   delete dataCache[ticker];
-  saveTickers();
-  sheetsRemove(ticker);
-  renderGrid(false);
+  saveTickers(); sheetsRemove(ticker); renderGrid(false);
   showToast(`${ticker} eliminado`);
 }
-
 function showToast(msg) {
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
+// ── INIT ───────────────────────────────────────────────
 updateMarketPill();
 setInterval(updateMarketPill, 30000);
-// Cargar tickers desde Google Sheets, luego iniciar
-loadFromSheets().then(() => {
-  renderGrid(false);
-  refreshAll();
-});
+loadFromSheets().then(()=>{ renderGrid(false); refreshAll(); });
 setInterval(refreshAll, 60000);
 </script>
 </body>
