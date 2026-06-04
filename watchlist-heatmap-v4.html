@@ -346,8 +346,16 @@ async function fetchTicker(ticker) {
 async function refreshAll() {
   updateMarketPill();
   renderGrid(true);
-  const results = await Promise.all(tickers.map(t=>fetchTicker(t)));
-  results.forEach(r=>{ dataCache[r.ticker]=r; });
+  // Procesar en batches de 15 para respetar rate limit de Finnhub (60 calls/min)
+  // 15 tickers x 3 calls = 45 calls por batch, con pausa entre batches
+  const batchSize = 15;
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const batch = tickers.slice(i, i + batchSize);
+    const results = await Promise.all(batch.map(t => fetchTicker(t)));
+    results.forEach(r => { dataCache[r.ticker] = r; });
+    renderGrid(false);
+    if (i + batchSize < tickers.length) await new Promise(r => setTimeout(r, 1200));
+  }
   document.getElementById('last-update').textContent =
     'Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
   renderGrid(false);
