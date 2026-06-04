@@ -164,8 +164,10 @@ async function fetchTicker(ticker) {
     const c1y   = j1y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
     const c2y   = j2y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
 
-    // dayPct: Yahoo lo calcula directamente en meta
-    const dayPct = meta.regularMarketChangePercent ?? null;
+    // dayPct: regularMarketChangePercent o calcular desde anteultimo close de 1y
+    const dayPct = (meta.regularMarketChangePercent != null && meta.regularMarketChangePercent !== 0)
+      ? meta.regularMarketChangePercent
+      : (c1y.length >= 1 ? ((price - c1y[c1y.length-1]) / c1y[c1y.length-1]) * 100 : null);
 
     // weekPct: cierre de hace 5 sesiones dentro de c1y
     const weekStart = c1y.length>=6 ? c1y[c1y.length-6] : null;
