@@ -352,10 +352,8 @@ async function fetchTicker(ticker, includeRSI=false) {
     const quote = await resQ.json();
     if (!quote || quote.c == null || quote.c === 0) throw new Error('Sin datos');
 
-    const price     = quote.c;
-    const prevClose = quote.pc || quote.o || null;  // pc=previous close, o=open como fallback
-    const dayPct    = prevClose && prevClose !== price ? ((price - prevClose) / prevClose) * 100 : null;
-    console.log(ticker, {c: quote.c, pc: quote.pc, o: quote.o, dp: quote.dp, d: quote.d});
+    const price  = quote.c;
+    const dayPct = quote.dp ?? null;  // dp = day percent, calculado por Finnhub directamente
 
     // weekPct desde cache si existe
     let weekPct = dataCache[ticker]?.weekPct ?? null;
