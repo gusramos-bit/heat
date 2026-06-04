@@ -66,7 +66,7 @@
 
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance</span>
+  <span class="subtitle">Live · Finnhub</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 
@@ -92,7 +92,7 @@
   <button class="btn-add" onclick="addTicker()">+ Agregar</button>
 </div>
 
-<div class="proxy-status" id="proxy-status">Detectando conexión...</div>
+<div class="proxy-status" id="proxy-status">Via <span>Finnhub</span></div>
 
 <div class="legend" id="legend-price">
   <span>−10%</span>
@@ -269,51 +269,45 @@ async function tryFetch(url) {
 
 async function fetchTicker(ticker) {
   try {
-    // Dos llamadas en paralelo: 5d para precios del dia, 30d para RSI
-    const url5  = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d&includePrePost=false`;
-    const url30 = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y&includePrePost=false`;
-    const [res5, res30] = await Promise.all([tryFetch(url5), tryFetch(url30)]);
-    const json5  = await res5.json();
-    const json30 = await res30.json();
-    const result = json5?.chart?.result?.[0];
-    const meta   = result?.meta;
-    if (!meta) throw new Error('Sin datos');
+    const FKEY = 'd8grcphr01qhjpmpb2rgd8grcphr01qhjpmpb2s0';
+    const now = Math.floor(Date.now()/1000);
+    const from1y = now - 365*24*3600;
+    const from2y = now - 2*365*24*3600;
 
-    const price   = meta.regularMarketPrice;
-    const closes5 = result?.indicators?.quote?.[0]?.close?.filter(c=>c!=null)||[];
+    // Finnhub: sin proxy, sin cache, precio real
+    const [resQ, resD, resW] = await Promise.all([
+      fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FKEY}`),
+      fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=D&from=${from1y}&to=${now}&token=${FKEY}`),
+      fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${ticker}&resolution=W&from=${from2y}&to=${now}&token=${FKEY}`)
+    ]);
 
-    // dayPct: regularMarketChangePercent (mercado abierto) o anteultimo close de 5d (cerrado)
-    const dayPct = meta.regularMarketChangePercent != null
-      ? meta.regularMarketChangePercent
-      : (closes5.length >= 2 ? ((price - closes5[closes5.length-2]) / closes5[closes5.length-2]) * 100 : null);
+    const quote   = await resQ.json();
+    const candleD = await resD.json();
+    const candleW = await resW.json();
 
-    // weekPct: primer close del rango de 5d vs precio actual
-    const weekStart = closes5.length > 0 ? closes5[0] : null;
-    const weekPct = weekStart ? ((price - weekStart) / weekStart) * 100 : null;
+    if (!quote || quote.c == null || quote.c === 0) throw new Error('Sin datos');
 
-    // RSI diario(14) con datos de 30d
-    const closes30 = json30?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c=>c!=null)||[];
-    const rsi = calcRSI([...closes30, price], 14);
+    const price     = quote.c;
+    const prevClose = quote.pc;
+    const dayPct    = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
 
-    // RSI semanal(14): llamada separada con interval=1wk
-    let rsiWeekly = null;
-    try {
-      const urlW = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=2y&includePrePost=false`;
-      const resW = await tryFetch(urlW);
-      const jsonW = await resW.json();
-      const closesW = jsonW?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c=>c!=null)||[];
-      const priceW = jsonW?.chart?.result?.[0]?.meta?.regularMarketPrice || price;
-      rsiWeekly = calcRSI([...closesW, priceW], 14);
-    } catch(e) { rsiWeekly = null; }
+    // weekPct: cierre de hace 5 sesiones
+    const closesD   = (candleD?.c || []).filter(c => c != null);
+    const weekStart = closesD.length >= 6 ? closesD[closesD.length-6] : (closesD[0] || null);
+    const weekPct   = weekStart ? ((price - weekStart) / weekStart) * 100 : null;
 
+    // RSI diario y semanal
+    const rsi       = calcRSI([...closesD, price], 14);
+    const closesW   = (candleW?.c || []).filter(c => c != null);
+    const rsiWeekly = calcRSI([...closesW, price], 14);
 
-
-    return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, name:meta.shortName||ticker, ok:true };
+    return { ticker, price, dayPct, weekPct, rsi, rsiWeekly, name: ticker, ok: true };
   } catch(e) {
     console.warn(ticker, e.message);
     return { ticker, price:null, dayPct:null, weekPct:null, rsi:null, ok:false };
   }
 }
+
 
 async function refreshAll() {
   updateMarketPill();
