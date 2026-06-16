@@ -58,7 +58,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance</span>
+  <span class="subtitle">Live · Yahoo Finance · v1.0</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -153,24 +153,24 @@ function calcRSI(closes, period=14) {
 // ── FETCH ──────────────────────────────────────────────
 async function fetchTicker(ticker) {
   try {
-    // range=1d interval=1m para precio en tiempo real
-    // range=1y para RSI y weekPct
-    // range=2y semanal para RSI semanal
-    const url1m = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1m&range=1d`;
+    // range=1d interval=5m: precio intradiario reciente, mas estable que 1m
+    const url1d = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=5m&range=1d`;
     const url1y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
     const url2y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=2y`;
-    const [r1m, r1y, r2y] = await Promise.all([tryFetch(url1m), tryFetch(url1y), tryFetch(url2y)]);
-    const [j1m, j1y, j2y] = await Promise.all([r1m.json(), r1y.json(), r2y.json()]);
+    const [r1d, r1y, r2y] = await Promise.all([tryFetch(url1d), tryFetch(url1y), tryFetch(url2y)]);
+    const [j1d, j1y, j2y] = await Promise.all([r1d.json(), r1y.json(), r2y.json()]);
 
-    // Precio actual desde minutos (no cacheado por proxy)
-    const meta1m = j1m?.chart?.result?.[0]?.meta;
-    const meta1y = j1y?.chart?.result?.[0]?.meta;
-    if (!meta1y) throw new Error('sin meta');
+    const result1d = j1d?.chart?.result?.[0];
+    const meta1y   = j1y?.chart?.result?.[0]?.meta;
+    if (!result1d || !meta1y) throw new Error('sin datos');
 
-    // regularMarketPrice del 1m es el precio mas reciente
-    const price     = meta1m?.regularMarketPrice || meta1y.regularMarketPrice;
-    const prevClose = meta1m?.chartPreviousClose || meta1y.chartPreviousClose;
-    const dayPct    = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
+    // Precio actual = ultimo close no-null del array intradiario (mas confiable que meta)
+    const closesIntraday = (result1d?.indicators?.quote?.[0]?.close || []).filter(v => v != null);
+    const price = closesIntraday.length > 0 ? closesIntraday[closesIntraday.length - 1] : result1d.meta.regularMarketPrice;
+
+    // Previous close oficial: chartPreviousClose del endpoint 1d (cierre de ayer)
+    const prevClose = result1d.meta.chartPreviousClose;
+    const dayPct = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
 
     const c1y = j1y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
     const c2y = j2y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
@@ -183,6 +183,7 @@ async function fetchTicker(ticker) {
       rsiWeekly: calcRSI([...c2y, price], 14),
       name: meta1y.shortName||ticker, ok:true};
   } catch(e) {
+    console.warn(ticker, e.message);
     return {ticker, price:null, dayPct:null, weekPct:null, rsi:null, rsiWeekly:null, name:ticker, ok:false};
   }
 }
