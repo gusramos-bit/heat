@@ -126,7 +126,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v1.9</span>
+  <span class="subtitle">Live · Yahoo Finance · v2.0</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -287,10 +287,10 @@ function renderGrid(loading=false) {
   if (!tickers.length){grid.innerHTML='<div class="empty">Agregá tickers</div>';return;}
   grid.innerHTML = tickers.map(ticker => {
     const d = dataCache[ticker];
-    if (loading||!d) return `<div class="tile loading"><div class="ticker">${ticker}</div><div class="pct" style="color:var(--text-muted);font-size:10px">cargando…</div></div>`;
-    if (!d.ok) return `<div class="tile" style="background:#1a0e1e;border-color:#3a1a40"><button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button><div class="ticker" style="color:#777">${ticker}</div><div class="pct" style="font-size:10px;color:#555">sin datos</div></div>`;
-
     const cedearBadge = cedearMap[ticker] ? '<span class="cedear-badge">CD</span>' : '';
+
+    if (loading||!d) return `<div class="tile loading">${cedearBadge}<div class="ticker">${ticker}</div><div class="pct" style="color:var(--text-muted);font-size:10px">cargando…</div></div>`;
+    if (!d.ok) return `<div class="tile" style="background:#1a0e1e;border-color:#3a1a40">${cedearBadge}<button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button><div class="ticker" style="color:#777">${ticker}</div><div class="pct" style="font-size:10px;color:#555">sin datos</div></div>`;
 
     if (view==='rsi') {
       const rsi = rsiPeriod==='weekly' ? d.rsiWeekly : d.rsi;
