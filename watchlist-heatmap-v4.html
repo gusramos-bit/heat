@@ -58,7 +58,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v1.0</span>
+  <span class="subtitle">Live · Yahoo Finance · v1.1</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -214,8 +214,8 @@ function renderGrid(loading=false) {
     if (view==='rsi') {
       const rsi = rsiPeriod==='weekly' ? d.rsiWeekly : d.rsi;
       const bg  = rsi!=null ? colorRSI(rsi) : 'var(--surface)';
-      return `<div class="tile" style="background:${bg}">
-        <button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button>
+      return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+        <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
         <div class="ticker">${ticker}</div>
         <div class="rsi-val">${rsi!=null?rsi.toFixed(1):'—'}</div>
         <div class="rsi-label">RSI 14 ${rsiPeriod==='weekly'?'Semanal':'Diario'} · ${rsiTag(rsi)}</div>
@@ -226,8 +226,8 @@ function renderGrid(loading=false) {
 
     const pct = metric==='day' ? d.dayPct : d.weekPct;
     const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
-    return `<div class="tile" style="background:${bg}">
-      <button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button>
+    return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+      <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
       <div class="ticker">${ticker}</div>
       <div class="pct">${fmtPct(pct)}</div>
       <div class="price">${d.price?'$'+d.price.toFixed(2):''}</div>
@@ -329,6 +329,11 @@ function removeTicker(ticker) {
   saveTickers(); sheetsRemove(ticker); renderGrid(false);
   showToast(`${ticker} eliminado`);
 }
+function openTradingView(ticker, ev) {
+  if (ev) ev.stopPropagation();
+  window.open(`https://www.tradingview.com/chart/?symbol=${ticker}`, 'tradingview_chart');
+}
+
 function showToast(msg) {
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
