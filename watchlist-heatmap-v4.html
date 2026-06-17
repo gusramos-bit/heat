@@ -53,12 +53,57 @@
   .toast { position:fixed; bottom:24px; right:24px; background:var(--accent); color:#fff; padding:10px 18px; border-radius:8px; font-size:12px; opacity:0; transition:opacity 0.2s; pointer-events:none; }
   .toast.show { opacity:1; }
   .empty { color:var(--text-muted); font-size:12px; padding:40px; text-align:center; width:100%; }
+
+.chart-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  transition: height 0.25s ease;
+  overflow: hidden;
+  z-index: 100;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+}
+.chart-panel.open { height: 65vh; }
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  height: 44px;
+}
+.chart-header .ticker-label {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: #fff;
+}
+.chart-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.chart-close-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+.chart-panel iframe {
+  width: 100%;
+  height: calc(65vh - 44px);
+  border: none;
+}
 </style>
 </head>
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v1.2</span>
+  <span class="subtitle">Live · Yahoo Finance · v1.3</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -91,6 +136,13 @@
   <span style="color:#ff6b6b">Sobrecomprado &gt;70</span>
 </div>
 <div class="grid" id="grid"><div class="empty">Cargando...</div></div>
+<div class="chart-panel" id="chart-panel">
+  <div class="chart-header">
+    <span class="ticker-label" id="chart-ticker-label"></span>
+    <button class="chart-close-btn" onclick="closeChart()">✕ Cerrar</button>
+  </div>
+  <iframe id="chart-iframe" src=""></iframe>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -329,16 +381,21 @@ function removeTicker(ticker) {
   saveTickers(); sheetsRemove(ticker); renderGrid(false);
   showToast(`${ticker} eliminado`);
 }
-let _tvWindow = null;
 function openTradingView(ticker, ev) {
   if (ev) ev.stopPropagation();
-  const url = `https://www.tradingview.com/chart/?symbol=${ticker}`;
-  if (_tvWindow && !_tvWindow.closed) {
-    _tvWindow.location.href = url;
-    _tvWindow.focus();
-  } else {
-    _tvWindow = window.open(url, 'tradingview_chart');
-  }
+  const panel = document.getElementById('chart-panel');
+  const iframe = document.getElementById('chart-iframe');
+  const label = document.getElementById('chart-ticker-label');
+  // Widget embebible de TradingView (no requiere API key)
+  iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=D&theme=dark&style=1&toolbarbg=12121a&studies=RSI@tv-basicstudies`;
+  label.textContent = ticker;
+  panel.classList.add('open');
+}
+
+function closeChart() {
+  const panel = document.getElementById('chart-panel');
+  panel.classList.remove('open');
+  setTimeout(() => { document.getElementById('chart-iframe').src = ''; }, 250);
 }
 
 function showToast(msg) {
