@@ -103,7 +103,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v1.3</span>
+  <span class="subtitle">Live · Yahoo Finance · v1.4</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -387,7 +387,7 @@ function openTradingView(ticker, ev) {
   const iframe = document.getElementById('chart-iframe');
   const label = document.getElementById('chart-ticker-label');
   // Widget embebible de TradingView (no requiere API key)
-  iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=D&theme=dark&style=1&toolbarbg=12121a&studies=RSI@tv-basicstudies`;
+  iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=D&theme=dark&style=1&toolbarbg=12121a&studies=RSI@tv-basicstudies&timezone=America%2FArgentina%2FBuenos_Aires`;
   label.textContent = ticker;
   panel.classList.add('open');
 }
