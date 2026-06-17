@@ -58,7 +58,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v1.1</span>
+  <span class="subtitle">Live · Yahoo Finance · v1.2</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -329,9 +329,16 @@ function removeTicker(ticker) {
   saveTickers(); sheetsRemove(ticker); renderGrid(false);
   showToast(`${ticker} eliminado`);
 }
+let _tvWindow = null;
 function openTradingView(ticker, ev) {
   if (ev) ev.stopPropagation();
-  window.open(`https://www.tradingview.com/chart/?symbol=${ticker}`, 'tradingview_chart');
+  const url = `https://www.tradingview.com/chart/?symbol=${ticker}`;
+  if (_tvWindow && !_tvWindow.closed) {
+    _tvWindow.location.href = url;
+    _tvWindow.focus();
+  } else {
+    _tvWindow = window.open(url, 'tradingview_chart');
+  }
 }
 
 function showToast(msg) {
