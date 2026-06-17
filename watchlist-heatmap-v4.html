@@ -27,6 +27,16 @@
   .add-bar input:focus { border-color:var(--accent); }
   .add-bar input::placeholder { color:var(--text-muted); text-transform:none; }
   .btn-add { background:var(--accent); border:none; color:#fff; padding:7px 16px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; cursor:pointer; }
+.cedear-check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.cedear-check input { cursor: pointer; accent-color: var(--accent); }
   .proxy-status { font-size:10px; color:var(--text-muted); margin-bottom:12px; min-height:16px; }
   .proxy-status span { color:#7c6fff; }
   .legend { display:flex; align-items:center; gap:8px; margin-bottom:16px; font-size:10px; color:var(--text-muted); }
@@ -53,6 +63,19 @@
   .toast { position:fixed; bottom:24px; right:24px; background:var(--accent); color:#fff; padding:10px 18px; border-radius:8px; font-size:12px; opacity:0; transition:opacity 0.2s; pointer-events:none; }
   .toast.show { opacity:1; }
   .empty { color:var(--text-muted); font-size:12px; padding:40px; text-align:center; width:100%; }
+.cedear-badge {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.85);
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
 
 .chart-panel {
   position: fixed;
@@ -103,7 +126,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v1.4</span>
+  <span class="subtitle">Live · Yahoo Finance · v1.8</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -124,6 +147,7 @@
 </div>
 <div class="add-bar">
   <input type="text" id="ticker-input" placeholder="Agregar ticker..." maxlength="10" onkeydown="if(event.key==='Enter') addTicker()">
+  <label class="cedear-check"><input type="checkbox" id="ticker-cedear-check"> Tiene CEDEAR</label>
   <button class="btn-add" onclick="addTicker()">+ Agregar</button>
 </div>
 <div class="proxy-status" id="proxy-status">Conectando...</div>
@@ -148,6 +172,9 @@
 <script>
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzxSMyHXm9soBrD-_crWGROtYQ-5OxsvyJ1swR_akgeMe7yq2ox7NL40TT7z7TzShQ/exec';
 const DEFAULT_TICKERS = ['AAOI','APLD','ASTS','BE','BMNR','CIFR','CLSK','COIN','CRWV','DRAM','ENPH','EOSE','HIMS','HOOD','IBIT','INFQ','IONQ','IREN','KEEL','LAC','MARA','MP','MSFT','MSTR','NBIS','NOK','NU','NVTS','OKLO','ONDS','OSCR','PAGS','PLTR','POET','RGTI','RIOT','RIVN','RKLB','SNDK','SOFI','SPOT','TE','TEM','UAMY','UNH','VIST','VST','YPF','ZETA'];
+
+// cedearMap se llena desde Google Sheets (columna B = 'x')
+let cedearMap = {};
 const STORAGE_KEY = 'heatmap_v4';
 const PROXIES = [
   { name:'corsproxy.io',   wrap:u=>`https://corsproxy.io/?${encodeURIComponent(u)}` },
@@ -263,10 +290,13 @@ function renderGrid(loading=false) {
     if (loading||!d) return `<div class="tile loading"><div class="ticker">${ticker}</div><div class="pct" style="color:var(--text-muted);font-size:10px">cargando…</div></div>`;
     if (!d.ok) return `<div class="tile" style="background:#1a0e1e;border-color:#3a1a40"><button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button><div class="ticker" style="color:#777">${ticker}</div><div class="pct" style="font-size:10px;color:#555">sin datos</div></div>`;
 
+    const cedearBadge = cedearMap[ticker] ? '<span class="cedear-badge">CD</span>' : '';
+
     if (view==='rsi') {
       const rsi = rsiPeriod==='weekly' ? d.rsiWeekly : d.rsi;
       const bg  = rsi!=null ? colorRSI(rsi) : 'var(--surface)';
       return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+        ${cedearBadge}
         <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
         <div class="ticker">${ticker}</div>
         <div class="rsi-val">${rsi!=null?rsi.toFixed(1):'—'}</div>
@@ -279,6 +309,7 @@ function renderGrid(loading=false) {
     const pct = metric==='day' ? d.dayPct : d.weekPct;
     const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
     return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+      ${cedearBadge}
       <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
       <div class="ticker">${ticker}</div>
       <div class="pct">${fmtPct(pct)}</div>
@@ -343,8 +374,8 @@ function saveTickers() {
   tickers.sort();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
 }
-async function sheetsAdd(ticker) {
-  try { await fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({action:'add',ticker})}); } catch(e){}
+async function sheetsAdd(ticker, cedear) {
+  try { await fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({action:'add',ticker,cedear})}); } catch(e){}
 }
 async function sheetsRemove(ticker) {
   try { await fetch(SHEETS_URL,{method:'POST',body:JSON.stringify({action:'remove',ticker})}); } catch(e){}
@@ -355,22 +386,40 @@ async function loadFromSheets() {
     if (!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     if (Array.isArray(data)&&data.length>0) {
-      tickers = data.sort();
+      // Nuevo formato: [{ticker, cedear}, ...]
+      if (typeof data[0] === 'object' && data[0].ticker) {
+        tickers = data.map(d => d.ticker).sort();
+        cedearMap = {};
+        data.forEach(d => { cedearMap[d.ticker] = d.cedear; });
+      } else {
+        // Formato viejo: array de strings, sin info de cedear
+        tickers = data.sort();
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
+      localStorage.setItem(STORAGE_KEY+'_cedear', JSON.stringify(cedearMap));
       return;
     }
   } catch(e) { console.warn('Sheets:', e.message); }
   const saved = localStorage.getItem(STORAGE_KEY);
+  const savedCedear = localStorage.getItem(STORAGE_KEY+'_cedear');
   tickers = (JSON.parse(saved||'null')||[...DEFAULT_TICKERS]).sort();
+  cedearMap = JSON.parse(savedCedear||'{}');
 }
 
 async function addTicker() {
   const input=document.getElementById('ticker-input');
+  const cedearCheck=document.getElementById('ticker-cedear-check');
   const raw=input.value.trim().toUpperCase();
+  const hasCedear=cedearCheck.checked;
   if (!raw) return;
   if (tickers.includes(raw)){showToast(`${raw} ya está`);input.value='';return;}
   input.value='';
-  tickers.push(raw); saveTickers(); sheetsAdd(raw); renderGrid(false);
+  cedearCheck.checked=false;
+  tickers.push(raw); saveTickers();
+  cedearMap[raw]=hasCedear;
+  localStorage.setItem(STORAGE_KEY+'_cedear', JSON.stringify(cedearMap));
+  sheetsAdd(raw, hasCedear);
+  renderGrid(false);
   const d=await fetchTicker(raw);
   dataCache[raw]=d; renderGrid(false);
   showToast(d.ok?`${raw} agregado`:`${raw}: sin datos`);
@@ -387,7 +436,7 @@ function openTradingView(ticker, ev) {
   const iframe = document.getElementById('chart-iframe');
   const label = document.getElementById('chart-ticker-label');
   // Widget embebible de TradingView (no requiere API key)
-  iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=D&theme=dark&style=1&toolbarbg=12121a&studies=RSI@tv-basicstudies&timezone=America%2FArgentina%2FBuenos_Aires`;
+  iframe.src = `https://s.tradingview.com/widgetembed/?symbol=${ticker}&interval=D&theme=dark&style=1&toolbarbg=12121a&studies=RSI@tv-basicstudies&timezone=Etc%2FUTC-3`;
   label.textContent = ticker;
   panel.classList.add('open');
 }
