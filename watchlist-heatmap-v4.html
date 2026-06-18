@@ -126,7 +126,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v2.1</span>
+  <span class="subtitle">Live · Yahoo Finance · v2.2</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -451,6 +451,13 @@ function closeChart() {
   panel.classList.remove('open');
   setTimeout(() => { document.getElementById('chart-iframe').src = ''; }, 250);
 }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const panel = document.getElementById('chart-panel');
+    if (panel.classList.contains('open')) closeChart();
+  }
+});
 
 function showToast(msg) {
   const t=document.getElementById('toast');
