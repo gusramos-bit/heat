@@ -126,7 +126,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v2.2</span>
+  <span class="subtitle">Live · Yahoo Finance · v2.3</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -177,9 +177,7 @@ const DEFAULT_TICKERS = ['AAOI','APLD','ASTS','BE','BMNR','CIFR','CLSK','COIN','
 let cedearMap = {};
 const STORAGE_KEY = 'heatmap_v4';
 const PROXIES = [
-  { name:'corsproxy.io',   wrap:u=>`https://corsproxy.io/?${encodeURIComponent(u)}` },
-  { name:'allorigins',     wrap:u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
-  { name:'codetabs',       wrap:u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}` },
+  { name:'Cloudflare', wrap:u=>`https://yahoo-proxy.gusramos.workers.dev/?url=${encodeURIComponent(u)}` },
 ];
 
 let tickers = [];
