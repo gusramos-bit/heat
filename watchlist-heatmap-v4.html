@@ -126,7 +126,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v2.4</span>
+  <span class="subtitle">Live · Yahoo Finance · v2.5</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -230,37 +230,34 @@ function calcRSI(closes, period=14) {
 // ── FETCH ──────────────────────────────────────────────
 async function fetchTicker(ticker) {
   try {
-    const url1d = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=5m&range=1d&includePrePost=true`;
+    // v7/quote para precio en tiempo real + pre/post market (incluyendo ETFs)
+    // v8/chart para historicos (RSI + semana%)
+    const urlQ  = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}&fields=regularMarketPrice,regularMarketChangePercent,regularMarketPreviousClose,postMarketPrice,postMarketChangePercent,preMarketPrice,preMarketChangePercent,marketState,shortName`;
     const url1y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
     const url2y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=2y`;
-    const [r1d, r1y, r2y] = await Promise.all([tryFetch(url1d), tryFetch(url1y), tryFetch(url2y)]);
-    const [j1d, j1y, j2y] = await Promise.all([r1d.json(), r1y.json(), r2y.json()]);
+    const [rQ, r1y, r2y] = await Promise.all([tryFetch(urlQ), tryFetch(url1y), tryFetch(url2y)]);
+    const [jQ, j1y, j2y] = await Promise.all([rQ.json(), r1y.json(), r2y.json()]);
 
-    const result1d = j1d?.chart?.result?.[0];
-    const meta1d   = result1d?.meta;
-    const meta1y   = j1y?.chart?.result?.[0]?.meta;
-    if (!result1d || !meta1y) throw new Error('sin datos');
+    const q    = jQ?.quoteResponse?.result?.[0];
+    const meta1y = j1y?.chart?.result?.[0]?.meta;
+    if (!q || !meta1y) throw new Error('sin datos');
 
-    const prevClose = meta1d.chartPreviousClose;
-    const marketState = meta1d.marketState; // PRE, REGULAR, POST, POSTPOST, CLOSED
-
-    // Precio regular de cierre del dia
-    const regularPrice = meta1d.regularMarketPrice;
-    const dayPct = prevClose ? ((regularPrice - prevClose) / prevClose) * 100 : null;
+    const regularPrice = q.regularMarketPrice;
+    const dayPct       = q.regularMarketChangePercent ?? null;
+    const marketState  = q.marketState;
 
     // Pre/post market
     let extPrice = null, extPct = null, extLabel = null;
-    if (marketState === 'PRE' && meta1d.preMarketPrice) {
-      extPrice = meta1d.preMarketPrice;
-      extPct   = prevClose ? ((extPrice - prevClose) / prevClose) * 100 : null;
+    if (marketState === 'PRE' && q.preMarketPrice) {
+      extPrice = q.preMarketPrice;
+      extPct   = q.preMarketChangePercent ?? null;
       extLabel = 'Pre';
-    } else if ((marketState === 'POST' || marketState === 'POSTPOST' || marketState === 'CLOSED') && meta1d.postMarketPrice) {
-      extPrice = meta1d.postMarketPrice;
-      extPct   = regularPrice ? ((extPrice - regularPrice) / regularPrice) * 100 : null;
+    } else if ((marketState === 'POST' || marketState === 'POSTPOST' || marketState === 'CLOSED') && q.postMarketPrice) {
+      extPrice = q.postMarketPrice;
+      extPct   = q.postMarketChangePercent ?? null;
       extLabel = 'Post';
     }
 
-    // Precio a mostrar: extendido si existe, sino regular
     const displayPrice = extPrice || regularPrice;
     const displayPct   = extLabel ? extPct : dayPct;
 
@@ -272,7 +269,7 @@ async function fetchTicker(ticker) {
     return {ticker, price: displayPrice, regularPrice, dayPct, weekPct, displayPct, extLabel,
       rsi: calcRSI([...c1y, regularPrice], 14),
       rsiWeekly: calcRSI([...c2y, regularPrice], 14),
-      name: meta1y.shortName||ticker, ok:true};
+      name: q.shortName||meta1y.shortName||ticker, ok:true};
   } catch(e) {
     console.warn(ticker, e.message);
     return {ticker, price:null, dayPct:null, weekPct:null, rsi:null, rsiWeekly:null, name:ticker, ok:false};
