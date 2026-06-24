@@ -126,7 +126,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v2.3</span>
+  <span class="subtitle">Live · Yahoo Finance · v2.4</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -230,34 +230,48 @@ function calcRSI(closes, period=14) {
 // ── FETCH ──────────────────────────────────────────────
 async function fetchTicker(ticker) {
   try {
-    // range=1d interval=5m: precio intradiario reciente, mas estable que 1m
-    const url1d = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=5m&range=1d`;
+    const url1d = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=5m&range=1d&includePrePost=true`;
     const url1y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
     const url2y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=2y`;
     const [r1d, r1y, r2y] = await Promise.all([tryFetch(url1d), tryFetch(url1y), tryFetch(url2y)]);
     const [j1d, j1y, j2y] = await Promise.all([r1d.json(), r1y.json(), r2y.json()]);
 
     const result1d = j1d?.chart?.result?.[0];
+    const meta1d   = result1d?.meta;
     const meta1y   = j1y?.chart?.result?.[0]?.meta;
     if (!result1d || !meta1y) throw new Error('sin datos');
 
-    // Precio actual = ultimo close no-null del array intradiario (mas confiable que meta)
-    const closesIntraday = (result1d?.indicators?.quote?.[0]?.close || []).filter(v => v != null);
-    const price = closesIntraday.length > 0 ? closesIntraday[closesIntraday.length - 1] : result1d.meta.regularMarketPrice;
+    const prevClose = meta1d.chartPreviousClose;
+    const marketState = meta1d.marketState; // PRE, REGULAR, POST, POSTPOST, CLOSED
 
-    // Previous close oficial: chartPreviousClose del endpoint 1d (cierre de ayer)
-    const prevClose = result1d.meta.chartPreviousClose;
-    const dayPct = prevClose ? ((price - prevClose) / prevClose) * 100 : null;
+    // Precio regular de cierre del dia
+    const regularPrice = meta1d.regularMarketPrice;
+    const dayPct = prevClose ? ((regularPrice - prevClose) / prevClose) * 100 : null;
+
+    // Pre/post market
+    let extPrice = null, extPct = null, extLabel = null;
+    if (marketState === 'PRE' && meta1d.preMarketPrice) {
+      extPrice = meta1d.preMarketPrice;
+      extPct   = prevClose ? ((extPrice - prevClose) / prevClose) * 100 : null;
+      extLabel = 'Pre';
+    } else if ((marketState === 'POST' || marketState === 'POSTPOST' || marketState === 'CLOSED') && meta1d.postMarketPrice) {
+      extPrice = meta1d.postMarketPrice;
+      extPct   = regularPrice ? ((extPrice - regularPrice) / regularPrice) * 100 : null;
+      extLabel = 'Post';
+    }
+
+    // Precio a mostrar: extendido si existe, sino regular
+    const displayPrice = extPrice || regularPrice;
+    const displayPct   = extLabel ? extPct : dayPct;
 
     const c1y = j1y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
     const c2y = j2y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
-
     const weekStart = c1y.length>=6 ? c1y[c1y.length-6] : null;
-    const weekPct   = weekStart ? ((price-weekStart)/weekStart)*100 : null;
+    const weekPct   = weekStart ? ((regularPrice-weekStart)/weekStart)*100 : null;
 
-    return {ticker, price, dayPct, weekPct,
-      rsi: calcRSI([...c1y, price], 14),
-      rsiWeekly: calcRSI([...c2y, price], 14),
+    return {ticker, price: displayPrice, regularPrice, dayPct, weekPct, displayPct, extLabel,
+      rsi: calcRSI([...c1y, regularPrice], 14),
+      rsiWeekly: calcRSI([...c2y, regularPrice], 14),
       name: meta1y.shortName||ticker, ok:true};
   } catch(e) {
     console.warn(ticker, e.message);
@@ -304,13 +318,18 @@ function renderGrid(loading=false) {
       </div>`;
     }
 
-    const pct = metric==='day' ? d.dayPct : d.weekPct;
+    const pct = metric==='day'
+      ? (d.extLabel ? d.displayPct : d.dayPct)
+      : d.weekPct;
     const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
+    const extBadge = d.extLabel
+      ? `<span style="font-size:8px;background:rgba(255,255,255,0.15);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">${d.extLabel}</span>`
+      : '';
     return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
       ${cedearBadge}
       <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
       <div class="ticker">${ticker}</div>
-      <div class="pct">${fmtPct(pct)}</div>
+      <div class="pct">${fmtPct(pct)}${metric==='day'?extBadge:''}</div>
       <div class="price">${d.price?'$'+d.price.toFixed(2):''}</div>
       <div class="company-name">${d.name}</div>
     </div>`;
