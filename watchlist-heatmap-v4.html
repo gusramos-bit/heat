@@ -126,7 +126,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v2.5</span>
+  <span class="subtitle">Live · Yahoo Finance · v2.7</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -228,52 +228,66 @@ function calcRSI(closes, period=14) {
 }
 
 // ── FETCH ──────────────────────────────────────────────
-async function fetchTicker(ticker) {
+async function fetchQuote(ticker) {
   try {
-    // v7/quote para precio en tiempo real + pre/post market (incluyendo ETFs)
-    // v8/chart para historicos (RSI + semana%)
-    const urlQ  = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}&fields=regularMarketPrice,regularMarketChangePercent,regularMarketPreviousClose,postMarketPrice,postMarketChangePercent,preMarketPrice,preMarketChangePercent,marketState,shortName`;
-    const url1y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
-    const url2y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=2y`;
-    const [rQ, r1y, r2y] = await Promise.all([tryFetch(urlQ), tryFetch(url1y), tryFetch(url2y)]);
-    const [jQ, j1y, j2y] = await Promise.all([rQ.json(), r1y.json(), r2y.json()]);
-
-    const q    = jQ?.quoteResponse?.result?.[0];
-    const meta1y = j1y?.chart?.result?.[0]?.meta;
-    if (!q || !meta1y) throw new Error('sin datos');
+    const urlQ = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}&fields=regularMarketPrice,regularMarketChangePercent,postMarketPrice,postMarketChangePercent,preMarketPrice,preMarketChangePercent,marketState,shortName`;
+    const rQ = await tryFetch(urlQ);
+    const jQ = await rQ.json();
+    const q = jQ?.quoteResponse?.result?.[0];
+    if (!q) throw new Error('sin datos');
 
     const regularPrice = q.regularMarketPrice;
-    const dayPct       = q.regularMarketChangePercent ?? null;
-    const marketState  = q.marketState;
+    const dayPct = q.regularMarketChangePercent ?? null;
+    const marketState = q.marketState;
 
-    // Pre/post market
     let extPrice = null, extPct = null, extLabel = null;
     if (marketState === 'PRE' && q.preMarketPrice) {
       extPrice = q.preMarketPrice;
-      extPct   = q.preMarketChangePercent ?? null;
+      extPct = q.preMarketChangePercent ?? null;
       extLabel = 'Pre';
     } else if ((marketState === 'POST' || marketState === 'POSTPOST' || marketState === 'CLOSED') && q.postMarketPrice) {
       extPrice = q.postMarketPrice;
-      extPct   = q.postMarketChangePercent ?? null;
+      extPct = q.postMarketChangePercent ?? null;
       extLabel = 'Post';
     }
 
     const displayPrice = extPrice || regularPrice;
-    const displayPct   = extLabel ? extPct : dayPct;
+    const displayPct = extLabel ? extPct : dayPct;
+    const name = q.shortName || ticker;
 
+    // Preservar RSI y weekPct del cache anterior
+    const prev = dataCache[ticker] || {};
+    return {
+      ticker, price: displayPrice, regularPrice, dayPct, weekPct: prev.weekPct ?? null,
+      displayPct, extLabel, name,
+      rsi: prev.rsi ?? null, rsiWeekly: prev.rsiWeekly ?? null, ok: true
+    };
+  } catch(e) {
+    console.warn(ticker, e.message);
+    return { ticker, price: null, dayPct: null, weekPct: null, rsi: null, rsiWeekly: null, name: ticker, ok: false };
+  }
+}
+
+async function fetchCandles(ticker) {
+  try {
+    const url1y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
+    const url2y = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=2y`;
+    const [r1y, r2y] = await Promise.all([tryFetch(url1y), tryFetch(url2y)]);
+    const [j1y, j2y] = await Promise.all([r1y.json(), r2y.json()]);
+    const regularPrice = dataCache[ticker]?.regularPrice || 0;
     const c1y = j1y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
     const c2y = j2y?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
     const weekStart = c1y.length>=6 ? c1y[c1y.length-6] : null;
-    const weekPct   = weekStart ? ((regularPrice-weekStart)/weekStart)*100 : null;
+    if (dataCache[ticker]) {
+      dataCache[ticker].weekPct = weekStart ? ((regularPrice-weekStart)/weekStart)*100 : null;
+      dataCache[ticker].rsi = calcRSI([...c1y, regularPrice], 14);
+      dataCache[ticker].rsiWeekly = calcRSI([...c2y, regularPrice], 14);
+    }
+  } catch(e) { console.warn(ticker, 'candles:', e.message); }
+}
 
-    return {ticker, price: displayPrice, regularPrice, dayPct, weekPct, displayPct, extLabel,
-      rsi: calcRSI([...c1y, regularPrice], 14),
-      rsiWeekly: calcRSI([...c2y, regularPrice], 14),
-      name: q.shortName||meta1y.shortName||ticker, ok:true};
-  } catch(e) {
-    console.warn(ticker, e.message);
-    return {ticker, price:null, dayPct:null, weekPct:null, rsi:null, rsiWeekly:null, name:ticker, ok:false};
-  }
+async function fetchTicker(ticker) {
+  return fetchQuote(ticker);
 }
 
 // ── COLOR ──────────────────────────────────────────────
@@ -321,7 +335,7 @@ function renderGrid(loading=false) {
     const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
     const extBadge = d.extLabel
       ? `<span style="font-size:8px;background:rgba(255,255,255,0.15);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">${d.extLabel}</span>`
-      : '';
+      : `<span style="font-size:8px;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle;color:rgba(255,255,255,0.5)">Cierre</span>`;
     return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
       ${cedearBadge}
       <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
@@ -334,19 +348,30 @@ function renderGrid(loading=false) {
 }
 
 // ── REFRESH ────────────────────────────────────────────
+async function refreshQuotes() {
+  // 1 call/ticker — se ejecuta cada 60 seg
+  const results = await Promise.all(tickers.map(t => fetchQuote(t)));
+  results.forEach(r => { if (r.ok) dataCache[r.ticker] = { ...dataCache[r.ticker], ...r }; });
+  renderGrid(false);
+  document.getElementById('last-update').textContent =
+    'Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function refreshCandles() {
+  // 2 calls/ticker — se ejecuta cada 30 min
+  const batchSize = 5;
+  for (let i=0; i<tickers.length; i+=batchSize) {
+    await Promise.all(tickers.slice(i, i+batchSize).map(t => fetchCandles(t)));
+    renderGrid(false);
+    if (i+batchSize<tickers.length) await new Promise(r=>setTimeout(r,500));
+  }
+}
+
 async function refreshAll() {
   updateMarketPill();
   renderGrid(true);
-  const batchSize = 4;
-  for (let i=0; i<tickers.length; i+=batchSize) {
-    const batch = tickers.slice(i, i+batchSize);
-    const results = await Promise.all(batch.map(t=>fetchTicker(t)));
-    results.forEach(r=>{ dataCache[r.ticker]=r; });
-    renderGrid(false);
-    if (i+batchSize<tickers.length) await new Promise(r=>setTimeout(r,400));
-  }
-  document.getElementById('last-update').textContent =
-    'Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  await refreshQuotes();
+  await refreshCandles();
 }
 
 // ── VIEWS ──────────────────────────────────────────────
@@ -483,7 +508,8 @@ function showToast(msg) {
 updateMarketPill();
 setInterval(updateMarketPill, 30000);
 loadFromSheets().then(()=>{ renderGrid(false); refreshAll(); });
-setInterval(refreshAll, 60000);
+setInterval(refreshQuotes, 60000);      // quotes cada 60 seg (1 call/ticker)
+setInterval(refreshCandles, 30*60000);  // candles cada 30 min (2 calls/ticker)
 </script>
 </body>
 </html>
