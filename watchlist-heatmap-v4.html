@@ -126,7 +126,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v2.7</span>
+  <span class="subtitle">Live · Yahoo Finance · v2.8</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -249,6 +249,11 @@ async function fetchQuote(ticker) {
       extPrice = q.postMarketPrice;
       extPct = q.postMarketChangePercent ?? null;
       extLabel = 'Post';
+    }
+
+    // Solo mostrar pre/post si el movimiento supera ±1%
+    if (extLabel && extPct != null && Math.abs(extPct) < 1) {
+      extPrice = null; extPct = null; extLabel = null;
     }
 
     const displayPrice = extPrice || regularPrice;
