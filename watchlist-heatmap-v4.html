@@ -46,6 +46,16 @@
   .grid { display:flex; flex-wrap:wrap; gap:6px; }
   .tile { position:relative; border-radius:8px; padding:14px 12px 10px; transition:transform 0.12s,box-shadow 0.12s; flex:0 0 130px; width:130px; overflow:hidden; border:1px solid transparent; }
   .tile:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.4); border-color:rgba(255,255,255,0.15); z-index:2; }
+.tile.pulse-up { animation: pulseUp 1.8s ease-in-out infinite; }
+.tile.pulse-down { animation: pulseDown 1.8s ease-in-out infinite; }
+@keyframes pulseUp {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); border-color: rgba(0,230,118,0.3); }
+  50% { box-shadow: 0 0 12px 4px rgba(0, 230, 118, 0.4); border-color: rgba(0,230,118,0.9); }
+}
+@keyframes pulseDown {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0); border-color: rgba(255,23,68,0.3); }
+  50% { box-shadow: 0 0 12px 4px rgba(255, 23, 68, 0.4); border-color: rgba(255,23,68,0.9); }
+}
   .tile .remove-btn { position:absolute; top:5px; right:6px; font-size:11px; color:rgba(255,255,255,0.3); cursor:pointer; display:none; background:none; border:none; }
   .tile:hover .remove-btn { display:block; }
   .tile:hover .remove-btn:hover { color:#fff; }
@@ -126,7 +136,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v2.8</span>
+  <span class="subtitle">Live · Yahoo Finance · v2.9</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -341,7 +351,10 @@ function renderGrid(loading=false) {
     const extBadge = d.extLabel
       ? `<span style="font-size:8px;background:rgba(255,255,255,0.15);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">${d.extLabel}</span>`
       : `<span style="font-size:8px;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle;color:rgba(255,255,255,0.5)">Cierre</span>`;
-    return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+    const pulseClass = (metric==='day' && d.extLabel)
+      ? (d.displayPct >= 0 ? 'pulse-up' : 'pulse-down')
+      : '';
+    return `<div class="tile ${pulseClass}" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
       ${cedearBadge}
       <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
       <div class="ticker">${ticker}</div>
