@@ -385,6 +385,36 @@ function renderGrid(loading=false) {
 }
 
 
+function isMarketOpen() {
+  const ny = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+  const d = ny.getDay(), m = ny.getHours()*60+ny.getMinutes();
+  return d>=1 && d<=5 && m>=570 && m<960;
+}
+
+async function refreshQuotes() {
+  const results = await Promise.all(tickers.map(t => fetchQuote(t)));
+  results.forEach(r => { if (r.ok) dataCache[r.ticker] = { ...dataCache[r.ticker], ...r }; });
+  renderGrid(false);
+  document.getElementById('last-update').textContent =
+    'Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function refreshCandles() {
+  const batchSize = 5;
+  for (let i=0; i<tickers.length; i+=batchSize) {
+    await Promise.all(tickers.slice(i, i+batchSize).map(t => fetchCandles(t)));
+    renderGrid(false);
+    if (i+batchSize<tickers.length) await new Promise(r=>setTimeout(r,500));
+  }
+}
+
+async function refreshAll() {
+  updateMarketPill();
+  renderGrid(true);
+  await refreshQuotes();
+  await refreshCandles();
+}
+
 function updateMarketPill() {
   const ny=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
   const d=ny.getDay(), m=ny.getHours()*60+ny.getMinutes();
