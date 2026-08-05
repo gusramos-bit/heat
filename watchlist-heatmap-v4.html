@@ -138,7 +138,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v3.0</span>
+  <span class="subtitle">Live · Yahoo Finance · v3.1</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -369,18 +369,31 @@ function renderGrid(loading=false) {
     return;
   }
 
-  const withExt    = tickers.filter(t => dataCache[t]?.extLabel);
-  const withoutExt = tickers.filter(t => !dataCache[t]?.extLabel);
+  const withExt = tickers.filter(t => dataCache[t]?.extLabel);
 
   let html = '';
   if (withExt.length > 0) {
     html += '<div class="section-label">Pre / Post Market</div>';
     html += withExt.map(t => renderTile(t)).join('');
   }
-  if (withoutExt.length > 0) {
-    html += `<div class="section-label" style="margin-top:${withExt.length>0?'24px':'0'}">Cierre</div>`;
-    html += withoutExt.map(t => renderTile(t)).join('');
-  }
+  // Seccion cierre: TODOS los tickers (con su % de cierre, no el extendido)
+  html += `<div class="section-label" style="margin-top:${withExt.length>0?'24px':'0'}">Cierre</div>`;
+  html += tickers.map(t => {
+    const d = dataCache[t];
+    if (!d || !d.ok) return renderTile(t);
+    // Forzar vista de cierre independientemente del extLabel
+    const cedearBadge = cedearMap[t] ? '<span class="cedear-badge">CD</span>' : '';
+    const pct = d.dayPct;
+    const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
+    return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${t}', event)">
+      ${cedearBadge}
+      <button class="remove-btn" onclick="removeTicker('${t}'); event.stopPropagation();">✕</button>
+      <div class="ticker">${t}</div>
+      <div class="pct">${fmtPct(pct)}<span style="font-size:8px;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle;color:rgba(255,255,255,0.5)">Cierre</span></div>
+      <div class="price">${d.regularPrice?'$'+d.regularPrice.toFixed(2):''}</div>
+      <div class="company-name">${d.name}</div>
+    </div>`;
+  }).join('');
   grid.innerHTML = html;
 }
 
