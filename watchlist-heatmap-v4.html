@@ -46,16 +46,18 @@
   .grid { display:flex; flex-wrap:wrap; gap:6px; }
   .tile { position:relative; border-radius:8px; padding:14px 12px 10px; transition:transform 0.12s,box-shadow 0.12s; flex:0 0 130px; width:130px; overflow:hidden; border:1px solid transparent; }
   .tile:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.4); border-color:rgba(255,255,255,0.15); z-index:2; }
-.tile.pulse-up { animation: pulseUp 1.8s ease-in-out infinite; }
-.tile.pulse-down { animation: pulseDown 1.8s ease-in-out infinite; }
-@keyframes pulseUp {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); border-color: rgba(0,230,118,0.3); }
-  50% { box-shadow: 0 0 12px 4px rgba(0, 230, 118, 0.4); border-color: rgba(0,230,118,0.9); }
+.section-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  margin-top: 20px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  width: 100%;
 }
-@keyframes pulseDown {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0); border-color: rgba(255,23,68,0.3); }
-  50% { box-shadow: 0 0 12px 4px rgba(255, 23, 68, 0.4); border-color: rgba(255,23,68,0.9); }
-}
+.section-label:first-child { margin-top: 0; }
   .tile .remove-btn { position:absolute; top:5px; right:6px; font-size:11px; color:rgba(255,255,255,0.3); cursor:pointer; display:none; background:none; border:none; }
   .tile:hover .remove-btn { display:block; }
   .tile:hover .remove-btn:hover { color:#fff; }
@@ -136,7 +138,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v2.9</span>
+  <span class="subtitle">Live · Yahoo Finance · v3.0</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -320,103 +322,69 @@ function fmtPct(v){if(v==null||isNaN(v))return'—';return(v>=0?'+':'')+v.toFixe
 function rsiTag(r){if(r==null)return'';if(r<=30)return'Sobrevendido';if(r>=70)return'Sobrecomprado';return'Neutral';}
 
 // ── RENDER ─────────────────────────────────────────────
-function renderGrid(loading=false) {
-  const grid = document.getElementById('grid');
-  if (!tickers.length){grid.innerHTML='<div class="empty">Agregá tickers</div>';return;}
-  grid.innerHTML = tickers.map(ticker => {
-    const d = dataCache[ticker];
-    const cedearBadge = cedearMap[ticker] ? '<span class="cedear-badge">CD</span>' : '';
+function renderTile(ticker, loading=false) {
+  const d = dataCache[ticker];
+  const cedearBadge = cedearMap[ticker] ? '<span class="cedear-badge">CD</span>' : '';
+  if (loading||!d) return `<div class="tile loading">${cedearBadge}<div class="ticker">${ticker}</div><div class="pct" style="color:var(--text-muted);font-size:10px">cargando…</div></div>`;
+  if (!d.ok) return `<div class="tile" style="background:#1a0e1e;border-color:#3a1a40">${cedearBadge}<button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button><div class="ticker" style="color:#777">${ticker}</div><div class="pct" style="font-size:10px;color:#555">sin datos</div></div>`;
 
-    if (loading||!d) return `<div class="tile loading">${cedearBadge}<div class="ticker">${ticker}</div><div class="pct" style="color:var(--text-muted);font-size:10px">cargando…</div></div>`;
-    if (!d.ok) return `<div class="tile" style="background:#1a0e1e;border-color:#3a1a40">${cedearBadge}<button class="remove-btn" onclick="removeTicker('${ticker}')">✕</button><div class="ticker" style="color:#777">${ticker}</div><div class="pct" style="font-size:10px;color:#555">sin datos</div></div>`;
-
-    if (view==='rsi') {
-      const rsi = rsiPeriod==='weekly' ? d.rsiWeekly : d.rsi;
-      const bg  = rsi!=null ? colorRSI(rsi) : 'var(--surface)';
-      return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
-        ${cedearBadge}
-        <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
-        <div class="ticker">${ticker}</div>
-        <div class="rsi-val">${rsi!=null?rsi.toFixed(1):'—'}</div>
-        <div class="rsi-label">RSI 14 ${rsiPeriod==='weekly'?'Semanal':'Diario'} · ${rsiTag(rsi)}</div>
-        <div class="rsi-bar-wrap"><div class="rsi-bar-fill" style="width:${rsi||0}%"></div></div>
-        <div class="rsi-zones"><span>0</span><span>30</span><span>70</span><span>100</span></div>
-      </div>`;
-    }
-
-    const pct = metric==='day'
-      ? (d.extLabel ? d.displayPct : d.dayPct)
-      : d.weekPct;
-    const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
-    const extBadge = d.extLabel
-      ? `<span style="font-size:8px;background:rgba(255,255,255,0.15);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">${d.extLabel}</span>`
-      : `<span style="font-size:8px;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle;color:rgba(255,255,255,0.5)">Cierre</span>`;
-    const pulseClass = (metric==='day' && d.extLabel)
-      ? (d.displayPct >= 0 ? 'pulse-up' : 'pulse-down')
-      : '';
-    return `<div class="tile ${pulseClass}" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+  if (view==='rsi') {
+    const rsi = rsiPeriod==='weekly' ? d.rsiWeekly : d.rsi;
+    const bg  = rsi!=null ? colorRSI(rsi) : 'var(--surface)';
+    return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
       ${cedearBadge}
       <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
       <div class="ticker">${ticker}</div>
-      <div class="pct">${fmtPct(pct)}${metric==='day'?extBadge:''}</div>
-      <div class="price">${d.price?'$'+d.price.toFixed(2):''}</div>
-      <div class="company-name">${d.name}</div>
+      <div class="rsi-val">${rsi!=null?rsi.toFixed(1):'—'}</div>
+      <div class="rsi-label">RSI 14 ${rsiPeriod==='weekly'?'Semanal':'Diario'} · ${rsiTag(rsi)}</div>
+      <div class="rsi-bar-wrap"><div class="rsi-bar-fill" style="width:${rsi||0}%"></div></div>
+      <div class="rsi-zones"><span>0</span><span>30</span><span>70</span><span>100</span></div>
     </div>`;
-  }).join('');
-}
-
-// ── REFRESH ────────────────────────────────────────────
-async function refreshQuotes() {
-  // 1 call/ticker — se ejecuta cada 60 seg
-  const results = await Promise.all(tickers.map(t => fetchQuote(t)));
-  results.forEach(r => { if (r.ok) dataCache[r.ticker] = { ...dataCache[r.ticker], ...r }; });
-  renderGrid(false);
-  document.getElementById('last-update').textContent =
-    'Actualizado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-}
-
-async function refreshCandles() {
-  // 2 calls/ticker — se ejecuta cada 30 min
-  const batchSize = 5;
-  for (let i=0; i<tickers.length; i+=batchSize) {
-    await Promise.all(tickers.slice(i, i+batchSize).map(t => fetchCandles(t)));
-    renderGrid(false);
-    if (i+batchSize<tickers.length) await new Promise(r=>setTimeout(r,500));
   }
+
+  const pct = metric==='day' ? (d.extLabel ? d.displayPct : d.dayPct) : d.weekPct;
+  const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
+  const extBadge = d.extLabel
+    ? `<span style="font-size:8px;background:rgba(255,255,255,0.15);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">${d.extLabel}</span>`
+    : `<span style="font-size:8px;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle;color:rgba(255,255,255,0.5)">Cierre</span>`;
+  return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+    ${cedearBadge}
+    <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
+    <div class="ticker">${ticker}</div>
+    <div class="pct">${fmtPct(pct)}${metric==='day'?extBadge:''}</div>
+    <div class="price">${d.price?'$'+d.price.toFixed(2):''}</div>
+    <div class="company-name">${d.name}</div>
+  </div>`;
 }
 
-async function refreshAll() {
-  updateMarketPill();
-  renderGrid(true);
-  await refreshQuotes();
-  await refreshCandles();
+function renderGrid(loading=false) {
+  const grid = document.getElementById('grid');
+  if (!tickers.length){grid.innerHTML='<div class="empty">Agregá tickers</div>';return;}
+
+  // Secciones solo en modo precios + hoy% + mercado cerrado
+  const showSections = (view==='price' && metric==='day' && !isMarketOpen());
+
+  if (!showSections || loading) {
+    grid.innerHTML = tickers.map(t => renderTile(t, loading)).join('');
+    return;
+  }
+
+  const withExt    = tickers.filter(t => dataCache[t]?.extLabel);
+  const withoutExt = tickers.filter(t => !dataCache[t]?.extLabel);
+
+  let html = '';
+  if (withExt.length > 0) {
+    html += '<div class="section-label">Pre / Post Market</div>';
+    html += withExt.map(t => renderTile(t)).join('');
+  }
+  if (withoutExt.length > 0) {
+    html += `<div class="section-label" style="margin-top:${withExt.length>0?'24px':'0'}">Cierre</div>`;
+    html += withoutExt.map(t => renderTile(t)).join('');
+  }
+  grid.innerHTML = html;
 }
 
-// ── VIEWS ──────────────────────────────────────────────
-function setView(v) {
-  view=v;
-  document.getElementById('btn-price').classList.toggle('active',v==='price');
-  document.getElementById('btn-rsi').classList.toggle('active',v==='rsi');
-  document.getElementById('metric-group').style.display=v==='price'?'':'none';
-  document.getElementById('rsi-period-group').style.display=v==='rsi'?'':'none';
-  document.getElementById('legend-price').style.display=v==='price'?'flex':'none';
-  document.getElementById('legend-rsi').style.display=v==='rsi'?'flex':'none';
-  renderGrid();
-}
-function setMetric(m) {
-  metric=m;
-  document.getElementById('btn-day').classList.toggle('active',m==='day');
-  document.getElementById('btn-week').classList.toggle('active',m==='week');
-  renderGrid();
-}
-function setRsiPeriod(p) {
-  rsiPeriod=p;
-  document.getElementById('btn-rsi-daily').classList.toggle('active',p==='daily');
-  document.getElementById('btn-rsi-weekly').classList.toggle('active',p==='weekly');
-  renderGrid();
-}
 
-// ── MARKET PILL ────────────────────────────────────────
 function updateMarketPill() {
   const ny=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
   const d=ny.getDay(), m=ny.getHours()*60+ny.getMinutes();
