@@ -138,7 +138,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v3.1</span>
+  <span class="subtitle">Live · Yahoo Finance · v3.2</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -438,6 +438,31 @@ function updateMarketPill() {
 }
 
 // ── TICKERS ────────────────────────────────────────────
+function setView(v) {
+  view = v;
+  document.getElementById('btn-price').classList.toggle('active', v==='price');
+  document.getElementById('btn-rsi').classList.toggle('active', v==='rsi');
+  document.getElementById('metric-group').style.display = v==='price' ? '' : 'none';
+  document.getElementById('rsi-period-group').style.display = v==='rsi' ? '' : 'none';
+  document.getElementById('legend-price').style.display = v==='price' ? 'flex' : 'none';
+  document.getElementById('legend-rsi').style.display = v==='rsi' ? 'flex' : 'none';
+  renderGrid();
+}
+
+function setMetric(m) {
+  metric = m;
+  document.getElementById('btn-day').classList.toggle('active', m==='day');
+  document.getElementById('btn-week').classList.toggle('active', m==='week');
+  renderGrid();
+}
+
+function setRsiPeriod(p) {
+  rsiPeriod = p;
+  document.getElementById('btn-rsi-daily').classList.toggle('active', p==='daily');
+  document.getElementById('btn-rsi-weekly').classList.toggle('active', p==='weekly');
+  renderGrid();
+}
+
 function saveTickers() {
   tickers.sort();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
