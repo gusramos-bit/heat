@@ -145,7 +145,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v3.6</span>
+  <span class="subtitle">Live · Yahoo Finance · v3.7</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -383,8 +383,8 @@ function renderTile(ticker, loading=false) {
         <div class="range-bar-dot" style="left:${barPos}%"></div>
       </div>
       <div class="range-pcts">
-        <span class="range-pct-low">↑${pctFromLow!=null?pctFromLow.toFixed(2):'—'}% desde min</span>
-        <span class="range-pct-high">↑${pctToMax!=null?pctToMax.toFixed(2):'—'}% al max</span>
+        <span class="range-pct-low">+${pctFromLow!=null?pctFromLow.toFixed(2):'—'}% vs min</span>
+        <span class="range-pct-high">${pctToMax!=null?pctToMax.toFixed(2):'—'}% al max</span>
       </div>
     </div>`;
   }
