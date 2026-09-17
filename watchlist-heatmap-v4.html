@@ -145,14 +145,14 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v3.8</span>
+  <span class="subtitle">Live · Yahoo Finance · v3.9</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
   <div class="toggle-group">
     <button class="toggle-btn active" id="btn-price" onclick="setView('price')">Precios</button>
     <button class="toggle-btn" id="btn-rsi" onclick="setView('rsi')">RSI</button>
-    <button class="toggle-btn" id="btn-rango" onclick="setView('rango')">Rango</button>
+
   </div>
   <div class="toggle-group" id="metric-group">
     <button class="toggle-btn active" id="btn-day" onclick="setMetric('day')">Hoy %</button>
@@ -352,51 +352,36 @@ function renderTile(ticker, loading=false) {
     </div>`;
   }
 
-  if (view==='rango') {
-    const high = d.dayHigh, low = d.dayLow, price = d.regularPrice;
-    const range = high && low ? high - low : null;
-    const pos   = range ? (price - low) / range : null; // 0=min, 1=max
-    const pctToMax = high ? ((high - price) / price) * 100 : null;
-    const pctFromLow = low ? ((price - low) / price) * 100 : null;
-    // Color: verde cerca del max, rojo cerca del min
-    // Color por % del día (igual que modo Precios)
-    const bg = d.dayPct != null ? colorPrice(d.dayPct) : 'var(--surface)';
-    const barPos = pos != null ? (pos * 100).toFixed(0) : 50;
-    const dayPctStr = d.dayPct != null ? (d.dayPct >= 0 ? '+' : '') + d.dayPct.toFixed(2) + '%' : '—';
-    return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
-      ${cedearBadge}
-      <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
-        <div class="ticker">${ticker}</div>
-        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.85)">${dayPctStr}</div>
-      </div>
-      <div class="range-stats">
-        <span>$${low!=null?low.toFixed(2):'—'}</span>
-        <span>$${price!=null?price.toFixed(2):'—'}</span>
-        <span>$${high!=null?high.toFixed(2):'—'}</span>
-      </div>
-      <div class="range-bar-wrap">
-        <div class="range-bar-fill" style="width:${barPos}%"></div>
-        <div class="range-bar-dot" style="left:${barPos}%"></div>
-      </div>
-      <div class="range-pcts">
-        <span class="range-pct-low">+${pctFromLow!=null?pctFromLow.toFixed(2):'—'}% vs min</span>
-        <span class="range-pct-high">${pctToMax!=null?pctToMax.toFixed(2):'—'}% al max</span>
-      </div>
-    </div>`;
-  }
 
   const pct = metric==='day' ? (d.extLabel ? d.displayPct : d.dayPct) : d.weekPct;
   const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
   const extBadge = d.extLabel
     ? `<span style="font-size:8px;background:rgba(255,255,255,0.15);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">${d.extLabel}</span>`
     : (isMarketOpen() ? '' : `<span style="font-size:8px;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle;color:rgba(255,255,255,0.5)">Cierre</span>`);
+  // Barra de rango intradiario (solo en modo Hoy% con mercado abierto)
+  const showRange = (metric==='day' && isMarketOpen() && d.dayHigh && d.dayLow);
+  const rangeBar = showRange ? (() => {
+    const range = d.dayHigh - d.dayLow;
+    const pos = range > 0 ? ((d.regularPrice - d.dayLow) / range * 100).toFixed(0) : 50;
+    const pctToMax = ((d.dayHigh - d.regularPrice) / d.regularPrice * 100).toFixed(2);
+    const pctFromLow = ((d.regularPrice - d.dayLow) / d.regularPrice * 100).toFixed(2);
+    return `<div class="range-bar-wrap" style="margin:5px 0 3px">
+      <div class="range-bar-fill" style="width:${pos}%"></div>
+      <div class="range-bar-dot" style="left:${pos}%"></div>
+    </div>
+    <div class="range-pcts">
+      <span class="range-pct-low">+${pctFromLow}% vs min</span>
+      <span class="range-pct-high">${pctToMax}% al max</span>
+    </div>`;
+  })() : '';
+
   return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
     ${cedearBadge}
     <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
     <div class="ticker">${ticker}</div>
     <div class="pct">${fmtPct(pct)}${metric==='day'?extBadge:''}</div>
     <div class="price">${d.price?'$'+d.price.toFixed(2):''}</div>
+    ${rangeBar}
     <div class="company-name">${d.name}</div>
   </div>`;
 }
@@ -486,7 +471,7 @@ function setView(v) {
   view = v;
   document.getElementById('btn-price').classList.toggle('active', v==='price');
   document.getElementById('btn-rsi').classList.toggle('active', v==='rsi');
-  document.getElementById('btn-rango').classList.toggle('active', v==='rango');
+
   document.getElementById('metric-group').style.display = v==='price' ? '' : 'none';
   document.getElementById('rsi-period-group').style.display = v==='rsi' ? '' : 'none';
   document.getElementById('legend-price').style.display = v==='price' ? 'flex' : 'none';
