@@ -46,6 +46,13 @@
   .grid { display:flex; flex-wrap:wrap; gap:6px; }
   .tile { position:relative; border-radius:8px; padding:14px 12px 10px; transition:transform 0.12s,box-shadow 0.12s; flex:0 0 130px; width:130px; overflow:hidden; border:1px solid transparent; }
   .tile:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.4); border-color:rgba(255,255,255,0.15); z-index:2; }
+.range-bar-wrap { width:100%; height:5px; background:rgba(0,0,0,0.3); border-radius:3px; margin:6px 0 4px; position:relative; }
+.range-bar-fill { position:absolute; left:0; top:0; height:5px; background:rgba(255,255,255,0.2); border-radius:3px; }
+.range-bar-dot { position:absolute; top:-3px; width:11px; height:11px; background:#fff; border-radius:50%; transform:translateX(-50%); box-shadow:0 0 4px rgba(0,0,0,0.5); }
+.range-stats { display:flex; justify-content:space-between; font-size:8px; color:rgba(255,255,255,0.5); margin-bottom:2px; }
+.range-pcts { display:flex; justify-content:space-between; font-size:9px; font-weight:600; margin-top:2px; }
+.range-pct-low { color:#ff8080; }
+.range-pct-high { color:#80ffb0; }
 .section-label {
   font-size: 10px;
   color: var(--text-muted);
@@ -138,13 +145,14 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v3.4</span>
+  <span class="subtitle">Live · Yahoo Finance · v3.5</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
   <div class="toggle-group">
     <button class="toggle-btn active" id="btn-price" onclick="setView('price')">Precios</button>
     <button class="toggle-btn" id="btn-rsi" onclick="setView('rsi')">RSI</button>
+    <button class="toggle-btn" id="btn-rango" onclick="setView('rango')">Rango</button>
   </div>
   <div class="toggle-group" id="metric-group">
     <button class="toggle-btn active" id="btn-day" onclick="setMetric('day')">Hoy %</button>
@@ -242,7 +250,7 @@ function calcRSI(closes, period=14) {
 // ── FETCH ──────────────────────────────────────────────
 async function fetchQuote(ticker) {
   try {
-    const urlQ = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}&fields=regularMarketPrice,regularMarketChangePercent,postMarketPrice,postMarketChangePercent,preMarketPrice,preMarketChangePercent,marketState,shortName`;
+    const urlQ = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}&fields=regularMarketPrice,regularMarketChangePercent,regularMarketDayHigh,regularMarketDayLow,postMarketPrice,postMarketChangePercent,preMarketPrice,preMarketChangePercent,marketState,shortName`;
     const rQ = await tryFetch(urlQ);
     const jQ = await rQ.json();
     const q = jQ?.quoteResponse?.result?.[0];
@@ -274,9 +282,11 @@ async function fetchQuote(ticker) {
 
     // Preservar RSI y weekPct del cache anterior
     const prev = dataCache[ticker] || {};
+    const dayHigh = q.regularMarketDayHigh ?? null;
+    const dayLow  = q.regularMarketDayLow  ?? null;
     return {
       ticker, price: displayPrice, regularPrice, dayPct, weekPct: prev.weekPct ?? null,
-      displayPct, extLabel, name,
+      displayPct, extLabel, name, dayHigh, dayLow,
       rsi: prev.rsi ?? null, rsiWeekly: prev.rsiWeekly ?? null, ok: true
     };
   } catch(e) {
@@ -339,6 +349,43 @@ function renderTile(ticker, loading=false) {
       <div class="rsi-label">RSI 14 ${rsiPeriod==='weekly'?'Semanal':'Diario'} · ${rsiTag(rsi)}</div>
       <div class="rsi-bar-wrap"><div class="rsi-bar-fill" style="width:${rsi||0}%"></div></div>
       <div class="rsi-zones"><span>0</span><span>30</span><span>70</span><span>100</span></div>
+    </div>`;
+  }
+
+  if (view==='rango') {
+    const high = d.dayHigh, low = d.dayLow, price = d.regularPrice;
+    const range = high && low ? high - low : null;
+    const pos   = range ? (price - low) / range : null; // 0=min, 1=max
+    const pctToMax = high ? ((high - price) / price) * 100 : null;
+    const pctFromLow = low ? ((price - low) / price) * 100 : null;
+    // Color: verde cerca del max, rojo cerca del min
+    const getRangoColor = (p) => {
+      if (p == null) return 'var(--surface)';
+      if (p >= 0.8)  return 'rgb(0,140,70)';
+      if (p >= 0.6)  return 'rgb(20,100,60)';
+      if (p >= 0.4)  return 'rgb(40,40,60)';
+      if (p >= 0.2)  return 'rgb(120,30,40)';
+      return 'rgb(180,20,30)';
+    };
+    const bg = getRangoColor(pos);
+    const barPos = pos != null ? (pos * 100).toFixed(0) : 50;
+    return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+      ${cedearBadge}
+      <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
+      <div class="ticker">${ticker}</div>
+      <div class="range-stats">
+        <span>$${low!=null?low.toFixed(2):'—'}</span>
+        <span>$${price!=null?price.toFixed(2):'—'}</span>
+        <span>$${high!=null?high.toFixed(2):'—'}</span>
+      </div>
+      <div class="range-bar-wrap">
+        <div class="range-bar-fill" style="width:${barPos}%"></div>
+        <div class="range-bar-dot" style="left:${barPos}%"></div>
+      </div>
+      <div class="range-pcts">
+        <span class="range-pct-low">+${pctFromLow!=null?pctFromLow.toFixed(2):'—'}% min</span>
+        <span class="range-pct-high">-${pctToMax!=null?pctToMax.toFixed(2):'—'}% max</span>
+      </div>
     </div>`;
   }
 
@@ -442,12 +489,12 @@ function setView(v) {
   view = v;
   document.getElementById('btn-price').classList.toggle('active', v==='price');
   document.getElementById('btn-rsi').classList.toggle('active', v==='rsi');
+  document.getElementById('btn-rango').classList.toggle('active', v==='rango');
   document.getElementById('metric-group').style.display = v==='price' ? '' : 'none';
   document.getElementById('rsi-period-group').style.display = v==='rsi' ? '' : 'none';
   document.getElementById('legend-price').style.display = v==='price' ? 'flex' : 'none';
   document.getElementById('legend-rsi').style.display = v==='rsi' ? 'flex' : 'none';
   renderGrid();
-  // Si cambia a RSI y no hay datos de candles, cargarlos
   if (v === 'rsi' && tickers.some(t => !dataCache[t]?.rsi)) {
     refreshCandles();
   }
