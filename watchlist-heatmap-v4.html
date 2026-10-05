@@ -51,7 +51,7 @@
 .range-bar-fill { position:absolute; left:0; top:0; height:5px; background:rgba(255,255,255,0.2); border-radius:3px; }
 .range-bar-dot { position:absolute; top:-3px; width:11px; height:11px; background:#fff; border-radius:50%; transform:translateX(-50%); box-shadow:0 0 4px rgba(0,0,0,0.5); }
 .range-stats { display:flex; justify-content:space-between; font-size:8px; color:rgba(255,255,255,0.5); margin-bottom:2px; }
-.range-pcts { display:flex; justify-content:space-between; gap:3px; font-size:9px; font-weight:700; margin-top:3px; }
+.range-pcts { display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 3px; font-size:9px; font-weight:700; margin-top:3px; }
 .range-pcts span { background:rgba(0,0,0,0.38); padding:1px 4px; border-radius:3px; white-space:nowrap; }
 .range-pct-low { color:#ffc2c2; }
 .range-pct-high { color:#c4f7d6; }
@@ -160,6 +160,31 @@
   transition: all 0.15s;
 }
 .chart-close-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+/* ── Grupos ── */
+.groups-bar { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; align-items:center; }
+.group-chip { padding:5px 12px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; border:1px solid var(--border); border-radius:20px; cursor:pointer; background:var(--surface); color:var(--text-muted); transition:all 0.15s; }
+.group-chip:hover { border-color:var(--accent); color:var(--text); }
+.group-chip.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.group-chip .count { opacity:0.6; margin-left:4px; font-weight:400; }
+.group-chip.add { border-style:dashed; }
+.group-edit-btn { font-size:11px; color:var(--text-muted); background:none; border:none; cursor:pointer; font-family:'JetBrains Mono',monospace; padding:5px 6px; }
+.group-edit-btn:hover { color:var(--accent); }
+.section-label.group-label { color:var(--text); font-size:11px; font-weight:700; }
+.section-label.group-label .count { color:var(--text-muted); font-weight:400; margin-left:6px; }
+.section-sub { width:100%; font-size:9px; color:var(--text-muted); letter-spacing:1px; text-transform:uppercase; margin:4px 0 2px; }
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:200; padding:16px; }
+.modal-bg.open { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:10px; width:100%; max-width:520px; max-height:85vh; display:flex; flex-direction:column; }
+.modal-head { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; gap:8px; align-items:center; }
+.modal-head input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:13px; padding:8px 10px; outline:none; }
+.modal-head input:focus { border-color:var(--accent); }
+.modal-hint { font-size:10px; color:var(--text-muted); padding:10px 16px 0; }
+.modal-body { padding:10px 16px 14px; overflow-y:auto; display:flex; flex-wrap:wrap; gap:6px; }
+.pick { padding:5px 10px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:var(--bg); color:var(--text-muted); user-select:none; }
+.pick.on { background:rgba(124,111,255,0.2); border-color:var(--accent); color:#fff; }
+.modal-foot { padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:space-between; }
+.btn-danger { padding:7px 14px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; border:1px solid #4a2020; border-radius:6px; cursor:pointer; background:transparent; color:#ff8080; }
+.btn-danger:hover { background:#2d1b1b; }
 .chart-panel iframe {
   width: 100%;
   height: calc(65vh - 44px);
@@ -170,7 +195,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v4.0</span>
+  <span class="subtitle">Live · Yahoo Finance · v4.1</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -195,6 +220,7 @@
   <label class="cedear-check"><input type="checkbox" id="ticker-cedear-check"> Tiene CEDEAR</label>
   <button class="btn-add" onclick="addTicker()">+ Agregar</button>
 </div>
+<div class="groups-bar" id="groups-bar"></div>
 <div class="proxy-status" id="proxy-status">Conectando...</div>
 <div class="legend" id="legend-price">
   <span>−10%</span><div class="legend-bar"></div><span>+10%</span>
@@ -213,6 +239,22 @@
   <iframe id="chart-iframe" src=""></iframe>
 </div>
 <div class="toast" id="toast"></div>
+<div class="modal-bg" id="group-modal" onclick="if(event.target===this) closeGroupEditor()">
+  <div class="modal">
+    <div class="modal-head">
+      <input type="text" id="group-name-input" placeholder="Nombre del grupo" maxlength="30" onkeydown="if(event.key==='Enter') saveGroupEditor()">
+    </div>
+    <div class="modal-hint">Tocá los tickers que van en este grupo. Una acción puede estar en varios grupos.</div>
+    <div class="modal-body" id="group-picks"></div>
+    <div class="modal-foot">
+      <button class="btn-danger" id="group-delete-btn" onclick="deleteGroup()">Eliminar grupo</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeGroupEditor()">Cancelar</button>
+        <button class="btn-add" onclick="saveGroupEditor()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyM25bSWY5ajCLZgPzdm6m9uM1g8zY3dAwghoUyLZewwPw817mayE5CwlvtMGnH2s0/exec';
@@ -231,6 +273,12 @@ let view = 'price';
 let rsiPeriod = 'daily';
 let dataCache = {};
 let activeProxy = null;
+// Grupos: [{name, tickers:[...]}]  (una acción puede estar en varios)
+const GROUPS_KEY = STORAGE_KEY + '_groups';
+let groups = [];
+let activeGroup = null;   // null = Todos
+let editingGroup = null;  // índice del grupo en edición, -1 = nuevo
+let editPicks = new Set();
 
 // ── PROXY ──────────────────────────────────────────────
 async function tryFetch(url) {
@@ -421,46 +469,130 @@ function renderTile(ticker, loading=false) {
   </div>`;
 }
 
+// Tile de cierre forzado (mercado cerrado, sección "Cierre")
+function renderCloseTile(t) {
+  const d = dataCache[t];
+  if (!d || !d.ok) return renderTile(t);
+  const cedearBadge = cedearMap[t] ? '<span class="cedear-badge">CD</span>' : '';
+  const pct = d.dayPct;
+  const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
+  return `<div class="tile${tileTone(bg)}" style="background:${bg};cursor:pointer" onclick="openTradingView('${t}', event)">
+    ${cedearBadge}
+    <button class="remove-btn" onclick="removeTicker('${t}'); event.stopPropagation();">✕</button>
+    <div class="ticker">${t}</div>
+    <div class="pct">${fmtPct(pct)}<span class="ext-badge muted">Cierre</span></div>
+    <div class="price">${d.regularPrice?'$'+d.regularPrice.toFixed(2):''}</div>
+    <div class="company-name">${d.name}</div>
+  </div>`;
+}
+
+// Renderiza una lista de tickers; con mercado cerrado separa Pre/Post y Cierre
+function renderSet(list, loading, sub) {
+  const showSections = (view==='price' && metric==='day' && !isMarketOpen());
+  if (!showSections || loading) return list.map(t => renderTile(t, loading)).join('');
+  const withExt = list.filter(t => dataCache[t]?.extLabel);
+  let html = '';
+  const lbl = (txt, first) => sub
+    ? `<div class="section-sub">${txt}</div>`
+    : `<div class="section-label" style="margin-top:${first?'0':'24px'}">${txt}</div>`;
+  if (withExt.length) html += lbl('Pre / Post Market', true) + withExt.map(t => renderTile(t)).join('');
+  html += lbl('Cierre', !withExt.length) + list.map(renderCloseTile).join('');
+  return html;
+}
+
 function renderGrid(loading=false) {
   const grid = document.getElementById('grid');
+  renderGroupsBar();
   if (!tickers.length){grid.innerHTML='<div class="empty">Agregá tickers</div>';return;}
 
-  // Secciones solo en modo precios + hoy% + mercado cerrado
-  const showSections = (view==='price' && metric==='day' && !isMarketOpen());
+  // RSI: sin grupos, todo junto
+  if (view !== 'price' || !groups.length) { grid.innerHTML = renderSet(tickers, loading, false); return; }
 
-  if (!showSections || loading) {
-    grid.innerHTML = tickers.map(t => renderTile(t, loading)).join('');
+  // Un grupo seleccionado
+  if (activeGroup !== null && groups[activeGroup]) {
+    const list = groups[activeGroup].tickers.filter(t => tickers.includes(t));
+    grid.innerHTML = list.length ? renderSet(list, loading, false)
+      : '<div class="empty">Este grupo está vacío — tocá ✎ para agregarle tickers</div>';
     return;
   }
 
-  const withExt = tickers.filter(t => dataCache[t]?.extLabel);
-
+  // Todos: una sección por grupo + "Sin grupo"
   let html = '';
-  if (withExt.length > 0) {
-    html += '<div class="section-label">Pre / Post Market</div>';
-    html += withExt.map(t => renderTile(t)).join('');
+  const inAny = new Set();
+  groups.forEach((g, i) => {
+    const list = g.tickers.filter(t => tickers.includes(t));
+    list.forEach(t => inAny.add(t));
+    if (!list.length) return;
+    html += `<div class="section-label group-label" style="margin-top:${html?'24px':'0'}">${esc(g.name)}<span class="count">${list.length}</span></div>`;
+    html += renderSet(list, loading, true);
+  });
+  const rest = tickers.filter(t => !inAny.has(t));
+  if (rest.length) {
+    html += `<div class="section-label group-label" style="margin-top:${html?'24px':'0'}">Sin grupo<span class="count">${rest.length}</span></div>`;
+    html += renderSet(rest, loading, true);
   }
-  // Seccion cierre: TODOS los tickers (con su % de cierre, no el extendido)
-  html += `<div class="section-label" style="margin-top:${withExt.length>0?'24px':'0'}">Cierre</div>`;
-  html += tickers.map(t => {
-    const d = dataCache[t];
-    if (!d || !d.ok) return renderTile(t);
-    // Forzar vista de cierre independientemente del extLabel
-    const cedearBadge = cedearMap[t] ? '<span class="cedear-badge">CD</span>' : '';
-    const pct = d.dayPct;
-    const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
-    return `<div class="tile${tileTone(bg)}" style="background:${bg};cursor:pointer" onclick="openTradingView('${t}', event)">
-      ${cedearBadge}
-      <button class="remove-btn" onclick="removeTicker('${t}'); event.stopPropagation();">✕</button>
-      <div class="ticker">${t}</div>
-      <div class="pct">${fmtPct(pct)}<span class="ext-badge muted">Cierre</span></div>
-      <div class="price">${d.regularPrice?'$'+d.regularPrice.toFixed(2):''}</div>
-      <div class="company-name">${d.name}</div>
-    </div>`;
-  }).join('');
   grid.innerHTML = html;
 }
 
+// ── GRUPOS ─────────────────────────────────────────────
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function loadGroups() {
+  try { groups = JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]') || []; } catch(e) { groups = []; }
+}
+function saveGroups() {
+  try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groups)); } catch(e) {}
+}
+function renderGroupsBar() {
+  const bar = document.getElementById('groups-bar');
+  if (view !== 'price') { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  if (activeGroup !== null && !groups[activeGroup]) activeGroup = null;
+  let html = `<button class="group-chip${activeGroup===null?' active':''}" onclick="selectGroup(null)">Todos<span class="count">${tickers.length}</span></button>`;
+  groups.forEach((g, i) => {
+    const n = g.tickers.filter(t => tickers.includes(t)).length;
+    html += `<button class="group-chip${activeGroup===i?' active':''}" onclick="selectGroup(${i})">${esc(g.name)}<span class="count">${n}</span></button>`;
+  });
+  html += `<button class="group-chip add" onclick="openGroupEditor(-1)">+ Grupo</button>`;
+  if (activeGroup !== null) html += `<button class="group-edit-btn" onclick="openGroupEditor(${activeGroup})">✎ Editar grupo</button>`;
+  bar.innerHTML = html;
+}
+function selectGroup(i) { activeGroup = i; renderGrid(false); }
+function openGroupEditor(i) {
+  editingGroup = i;
+  const g = i >= 0 ? groups[i] : null;
+  editPicks = new Set(g ? g.tickers : []);
+  document.getElementById('group-name-input').value = g ? g.name : '';
+  document.getElementById('group-delete-btn').style.visibility = g ? 'visible' : 'hidden';
+  renderPicks();
+  document.getElementById('group-modal').classList.add('open');
+  setTimeout(() => document.getElementById('group-name-input').focus(), 50);
+}
+function renderPicks() {
+  document.getElementById('group-picks').innerHTML = tickers.map(t =>
+    `<span class="pick${editPicks.has(t)?' on':''}" onclick="togglePick('${t}')">${t}</span>`).join('');
+}
+function togglePick(t) { editPicks.has(t) ? editPicks.delete(t) : editPicks.add(t); renderPicks(); }
+function closeGroupEditor() { document.getElementById('group-modal').classList.remove('open'); editingGroup = null; }
+function saveGroupEditor() {
+  const name = document.getElementById('group-name-input').value.trim();
+  if (!name) { showToast('Poné un nombre al grupo'); return; }
+  const dup = groups.findIndex((g, i) => i !== editingGroup && g.name.toLowerCase() === name.toLowerCase());
+  if (dup >= 0) { showToast('Ya existe un grupo con ese nombre'); return; }
+  const list = [...editPicks].sort();
+  if (editingGroup >= 0) { groups[editingGroup] = { name, tickers: list }; }
+  else { groups.push({ name, tickers: list }); activeGroup = groups.length - 1; }
+  saveGroups(); closeGroupEditor(); renderGrid(false);
+  showToast(`Grupo "${name}" guardado`);
+}
+function deleteGroup() {
+  if (editingGroup == null || editingGroup < 0) return;
+  const name = groups[editingGroup].name;
+  if (!confirm(`¿Eliminar el grupo "${name}"? Las acciones no se borran.`)) return;
+  groups.splice(editingGroup, 1);
+  activeGroup = null;
+  saveGroups(); closeGroupEditor(); renderGrid(false);
+  showToast(`Grupo "${name}" eliminado`);
+}
 
 function isMarketOpen() {
   const ny = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
@@ -581,6 +713,9 @@ async function addTicker() {
   input.value='';
   cedearCheck.checked=false;
   tickers.push(raw); saveTickers();
+  if (view==='price' && activeGroup !== null && groups[activeGroup]) {
+    groups[activeGroup].tickers.push(raw); groups[activeGroup].tickers.sort(); saveGroups();
+  }
   renderGrid(false); // muestra el tile en loading mientras se confirma el cedear real
   const realCedear = await sheetsAdd(raw, hasCedear);
   cedearMap[raw] = realCedear;
@@ -593,6 +728,7 @@ async function addTicker() {
 function removeTicker(ticker) {
   tickers=tickers.filter(t=>t!==ticker);
   delete dataCache[ticker];
+  groups.forEach(g => { g.tickers = g.tickers.filter(t => t!==ticker); }); saveGroups();
   saveTickers(); sheetsRemove(ticker); renderGrid(false);
   showToast(`${ticker} eliminado`);
 }
@@ -615,6 +751,7 @@ function closeChart() {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (document.getElementById('group-modal').classList.contains('open')) { closeGroupEditor(); return; }
     const panel = document.getElementById('chart-panel');
     if (panel.classList.contains('open')) closeChart();
   }
@@ -627,6 +764,7 @@ function showToast(msg) {
 }
 
 // ── INIT ───────────────────────────────────────────────
+loadGroups();
 updateMarketPill();
 setInterval(updateMarketPill, 30000);
 loadFromSheets().then(()=>{ renderGrid(false); refreshAll(); });
