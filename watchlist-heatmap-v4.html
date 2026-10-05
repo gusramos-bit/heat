@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -50,9 +51,33 @@
 .range-bar-fill { position:absolute; left:0; top:0; height:5px; background:rgba(255,255,255,0.2); border-radius:3px; }
 .range-bar-dot { position:absolute; top:-3px; width:11px; height:11px; background:#fff; border-radius:50%; transform:translateX(-50%); box-shadow:0 0 4px rgba(0,0,0,0.5); }
 .range-stats { display:flex; justify-content:space-between; font-size:8px; color:rgba(255,255,255,0.5); margin-bottom:2px; }
-.range-pcts { display:flex; justify-content:space-between; font-size:9px; font-weight:600; margin-top:2px; }
-.range-pct-low { color:#ff8080; }
-.range-pct-high { color:#80ffb0; }
+.range-pcts { display:flex; justify-content:space-between; gap:3px; font-size:9px; font-weight:700; margin-top:3px; }
+.range-pcts span { background:rgba(0,0,0,0.38); padding:1px 4px; border-radius:3px; white-space:nowrap; }
+.range-pct-low { color:#ffc2c2; }
+.range-pct-high { color:#c4f7d6; }
+.ext-badge { font-size:8px; background:rgba(255,255,255,0.15); padding:1px 5px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+.ext-badge.muted { background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.6); }
+
+/* ── Tiles con fondo claro (verdes intensos): texto oscuro ── */
+.tile.tile-light .ticker,
+.tile.tile-light .pct,
+.tile.tile-light .rsi-val { color:#08140d; }
+.tile.tile-light .price { color:rgba(8,20,13,0.78); }
+.tile.tile-light .company-name { color:rgba(8,20,13,0.66); }
+.tile.tile-light .rsi-label,
+.tile.tile-light .rsi-zones { color:rgba(8,20,13,0.7); }
+.tile.tile-light .rsi-bar-wrap { background:rgba(0,0,0,0.15); }
+.tile.tile-light .rsi-bar-fill { background:rgba(8,20,13,0.75); }
+.tile.tile-light .range-bar-wrap { background:rgba(0,0,0,0.18); }
+.tile.tile-light .range-bar-fill { background:rgba(0,0,0,0.25); }
+.tile.tile-light .range-pcts span { background:none; padding:1px 0; }
+.tile.tile-light .range-pct-low { color:#8c0d20; }
+.tile.tile-light .range-pct-high { color:#0a4422; }
+.tile.tile-light .cedear-badge { background:rgba(0,0,0,0.16); color:rgba(8,20,13,0.85); }
+.tile.tile-light .ext-badge { background:rgba(0,0,0,0.14); color:#08140d; }
+.tile.tile-light .ext-badge.muted { background:rgba(0,0,0,0.1); color:rgba(8,20,13,0.7); }
+.tile.tile-light .remove-btn { color:rgba(0,0,0,0.4); }
+.tile.tile-light:hover .remove-btn:hover { color:#000; }
 .section-label {
   font-size: 10px;
   color: var(--text-muted);
@@ -145,7 +170,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v3.9</span>
+  <span class="subtitle">Live · Yahoo Finance · v4.0</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -328,6 +353,16 @@ function colorRSI(r) {
   if (r>=70){const t=(r-70)/30;return `rgb(${Math.round(180+75*t)},${Math.round(40*(1-t))},${Math.round(40*(1-t))})`;}
   const t=(r-30)/40;return `rgb(${Math.round(60+60*t)},${Math.round(60+20*(1-t))},${Math.round(80+20*t)})`;
 }
+// Devuelve ' tile-light' si el fondo es claro y el texto oscuro se lee mejor que el blanco
+function tileTone(bg) {
+  const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(bg || '');
+  if (!m) return '';
+  const lin = c => { c/=255; return c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
+  const L = 0.2126*lin(+m[1]) + 0.7152*lin(+m[2]) + 0.0722*lin(+m[3]);
+  const vsWhite = 1.05/(L+0.05);
+  const vsDark  = (L+0.05)/0.057;
+  return vsDark > vsWhite ? ' tile-light' : '';
+}
 function fmtPct(v){if(v==null||isNaN(v))return'—';return(v>=0?'+':'')+v.toFixed(2)+'%';}
 function rsiTag(r){if(r==null)return'';if(r<=30)return'Sobrevendido';if(r>=70)return'Sobrecomprado';return'Neutral';}
 
@@ -341,7 +376,7 @@ function renderTile(ticker, loading=false) {
   if (view==='rsi') {
     const rsi = rsiPeriod==='weekly' ? d.rsiWeekly : d.rsi;
     const bg  = rsi!=null ? colorRSI(rsi) : 'var(--surface)';
-    return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+    return `<div class="tile${tileTone(bg)}" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
       ${cedearBadge}
       <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
       <div class="ticker">${ticker}</div>
@@ -356,8 +391,8 @@ function renderTile(ticker, loading=false) {
   const pct = metric==='day' ? (d.extLabel ? d.displayPct : d.dayPct) : d.weekPct;
   const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
   const extBadge = d.extLabel
-    ? `<span style="font-size:8px;background:rgba(255,255,255,0.15);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">${d.extLabel}</span>`
-    : (isMarketOpen() ? '' : `<span style="font-size:8px;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle;color:rgba(255,255,255,0.5)">Cierre</span>`);
+    ? `<span class="ext-badge">${d.extLabel}</span>`
+    : (isMarketOpen() ? '' : `<span class="ext-badge muted">Cierre</span>`);
   // Barra de rango intradiario (solo en modo Hoy% con mercado abierto)
   const showRange = (metric==='day' && isMarketOpen() && d.dayHigh && d.dayLow);
   const rangeBar = showRange ? (() => {
@@ -375,7 +410,7 @@ function renderTile(ticker, loading=false) {
     </div>`;
   })() : '';
 
-  return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
+  return `<div class="tile${tileTone(bg)}" style="background:${bg};cursor:pointer" onclick="openTradingView('${ticker}', event)">
     ${cedearBadge}
     <button class="remove-btn" onclick="removeTicker('${ticker}'); event.stopPropagation();">✕</button>
     <div class="ticker">${ticker}</div>
@@ -414,11 +449,11 @@ function renderGrid(loading=false) {
     const cedearBadge = cedearMap[t] ? '<span class="cedear-badge">CD</span>' : '';
     const pct = d.dayPct;
     const bg  = pct!=null ? colorPrice(pct) : 'var(--surface)';
-    return `<div class="tile" style="background:${bg};cursor:pointer" onclick="openTradingView('${t}', event)">
+    return `<div class="tile${tileTone(bg)}" style="background:${bg};cursor:pointer" onclick="openTradingView('${t}', event)">
       ${cedearBadge}
       <button class="remove-btn" onclick="removeTicker('${t}'); event.stopPropagation();">✕</button>
       <div class="ticker">${t}</div>
-      <div class="pct">${fmtPct(pct)}<span style="font-size:8px;background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle;color:rgba(255,255,255,0.5)">Cierre</span></div>
+      <div class="pct">${fmtPct(pct)}<span class="ext-badge muted">Cierre</span></div>
       <div class="price">${d.regularPrice?'$'+d.regularPrice.toFixed(2):''}</div>
       <div class="company-name">${d.name}</div>
     </div>`;
