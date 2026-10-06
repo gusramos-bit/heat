@@ -195,7 +195,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v4.2</span>
+  <span class="subtitle">Live · Yahoo Finance · v4.3</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -505,45 +505,16 @@ function renderGrid(loading=false) {
   renderGroupsBar();
   if (!tickers.length){grid.innerHTML='<div class="empty">Agregá tickers</div>';return;}
 
-  // RSI o sin grupos: todo junto (con Pre/Post arriba si corresponde)
-  if (view !== 'price' || !groups.length) { grid.innerHTML = renderSet(tickers, loading, false); return; }
-
-  // Un grupo seleccionado
-  if (activeGroup !== null && groups[activeGroup]) {
+  // Grupo seleccionado (solo vista Precios): solo sus tickers
+  if (view === 'price' && activeGroup !== null && groups[activeGroup]) {
     const list = groups[activeGroup].tickers.filter(t => tickers.includes(t));
     grid.innerHTML = list.length ? renderSet(list, loading, false)
       : '<div class="empty">Este grupo está vacío — tocá ✎ para agregarle tickers</div>';
     return;
   }
 
-  // Todos
-  const closedSplit = (metric==='day' && !isMarketOpen() && !loading);
-  let html = '';
-
-  // Pre/Post: todas juntas arriba, sin agrupar
-  if (closedSplit) {
-    const withExt = tickers.filter(t => dataCache[t]?.extLabel);
-    if (withExt.length) {
-      html += '<div class="section-label" style="margin-top:0">Pre / Post Market</div>';
-      html += withExt.map(t => renderTile(t)).join('');
-    }
-  }
-
-  // Grupos: con mercado cerrado muestran el cierre; abierto, el tile normal
-  const tile = t => closedSplit ? renderCloseTile(t) : renderTile(t, loading);
-  const inAny = new Set();
-  const section = (name, list) => {
-    html += `<div class="section-label group-label" style="margin-top:${html?'24px':'0'}">${esc(name)}<span class="count">${list.length}</span></div>`;
-    html += list.map(tile).join('');
-  };
-  groups.forEach(g => {
-    const list = g.tickers.filter(t => tickers.includes(t));
-    list.forEach(t => inAny.add(t));
-    if (list.length) section(g.name, list);
-  });
-  const rest = tickers.filter(t => !inAny.has(t));
-  if (rest.length) section('Sin grupo', rest);
-  grid.innerHTML = html;
+  // Todos (o RSI): todas juntas, con Pre/Post arriba y Cierre abajo si el mercado está cerrado
+  grid.innerHTML = renderSet(tickers, loading, false);
 }
 
 // ── GRUPOS ─────────────────────────────────────────────
