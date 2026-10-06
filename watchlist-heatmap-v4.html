@@ -195,7 +195,7 @@
 <body>
 <header>
   <h1>Watchlist Heat Map</h1>
-  <span class="subtitle">Live · Yahoo Finance · v4.3</span>
+  <span class="subtitle">Live · Yahoo Finance · v4.4</span>
   <span class="market-pill" id="market-pill">...</span>
 </header>
 <div class="controls">
@@ -519,11 +519,41 @@ function renderGrid(loading=false) {
 
 // ── GRUPOS ─────────────────────────────────────────────
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function loadGroups() {
+let groupsInSheet = false; // true si el Apps Script ya soporta grupos
+
+function loadGroupsLocal() {
   try { groups = JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]') || []; } catch(e) { groups = []; }
+}
+// Carga grupos desde la pestaña "Grupos" del Sheet; si el script no lo soporta, usa el navegador
+async function loadGroups() {
+  loadGroupsLocal();
+  try {
+    const res = await fetch(SHEETS_URL + '?action=groups', {redirect:'follow'});
+    const data = await res.json();
+    if (data && Array.isArray(data.groups)) {
+      groupsInSheet = true;
+      if (data.groups.length) {
+        groups = data.groups;
+        try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groups)); } catch(e) {}
+      } else if (groups.length) {
+        // Sheet vacío pero hay grupos en este navegador: los sube (migración)
+        await pushGroups();
+        showToast('Grupos subidos al Sheet');
+      }
+    }
+  } catch(e) { console.warn('Grupos Sheet:', e.message); }
+}
+async function pushGroups() {
+  try {
+    const res = await fetch(SHEETS_URL, {method:'POST', body:JSON.stringify({action:'saveGroups', groups})});
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error('respuesta inesperada');
+    return true;
+  } catch(e) { console.warn('Guardar grupos:', e.message); return false; }
 }
 function saveGroups() {
   try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groups)); } catch(e) {}
+  if (groupsInSheet) pushGroups().then(ok => { if (!ok) showToast('No se pudo guardar en el Sheet'); });
 }
 function renderGroupsBar() {
   const bar = document.getElementById('groups-bar');
@@ -747,10 +777,9 @@ function showToast(msg) {
 }
 
 // ── INIT ───────────────────────────────────────────────
-loadGroups();
 updateMarketPill();
 setInterval(updateMarketPill, 30000);
-loadFromSheets().then(()=>{ renderGrid(false); refreshAll(); });
+Promise.all([loadFromSheets(), loadGroups()]).then(()=>{ renderGrid(false); refreshAll(); });
 setInterval(refreshQuotes, 60000);      // quotes cada 60 seg (1 call/ticker)
 setInterval(refreshCandles, 30*60000);  // candles cada 30 min (2 calls/ticker)
 </script>
